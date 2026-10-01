@@ -185,3 +185,6 @@ button.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none;
 .slot .num, .slot .cnt { z-index: 1; }
 .prompt-icon { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 26px; border-radius: 4px; margin-right: 8px; vertical-align: middle; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6); }
 .prompt-icon .icon { width: 40px; height: 20px; }
+.dmg-num.struct { font-size: 20px; color: #f2f2f2; opacity: .9; }
+
+#crosshair svg { position: absolute; left: -100px; top: -100px; width: 200px; height: 200px; overflow: visible; }

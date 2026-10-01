@@ -129,6 +129,17 @@ export class Game {
       this.fx.burst(c, p.mat === 'wood' ? '#a0703f' : p.mat === 'brick' ? '#b0533a' : '#9aa5b1', 10, 5, 2);
       sfx('buildBreak', Math.max(0.05, 1 - c.distanceTo(this.player.pos) / 120));
     };
+    // Breaking any chunk of the map: debris, sound, and anything resting on
+    // it (player builds, loot, chests) settles or falls.
+    this.world.onStaticDestroyed = (el) => {
+      const c = new THREE.Vector3((el.min.x + el.max.x) / 2, (el.min.y + el.max.y) / 2, (el.min.z + el.max.z) / 2);
+      if ((this.world.brokenThisFrame || 0) < 12) {
+        this.fx.burst(c, el.mat === 'wood' ? '#a0703f' : el.mat === 'brick' ? '#c9c0b0' : '#9aa5b1', 6, 5, 2);
+        if (this.world.brokenThisFrame < 3) sfx('buildBreak', Math.max(0.05, 1 - c.distanceTo(this.player.pos) / 120));
+      }
+      this.mapDirty = this.mapDirty || [];
+      this.mapDirty.push(el);
+    };
     this.loot = new LootSystem(scene, this.collision);
     this.loot.spawnFromSpots(this.world.lootSpots);
     this.fx = new FX(scene, this.camera, document.getElementById('numbers'));
@@ -386,6 +397,19 @@ export class Game {
     document.getElementById('pause').classList.toggle('hidden', locked);
   }
 
+  settleAfterBreak() {
+    const els = this.mapDirty;
+    this.mapDirty = [];
+    if (this.builds.list.length) this.builds.collapseUnsupported();
+    const near = (pos) => els.some((el) => pos.x > el.min.x - 1 && pos.x < el.max.x + 1 && pos.z > el.min.z - 1 && pos.z < el.max.z + 1 && pos.y >= el.min.y - 0.5 && pos.y <= el.max.y + 1.5);
+    for (const pk of this.loot.pickups) if (near(pk.pos)) { pk.settled = false; pk.vel.set(0, 0, 0); }
+    for (const ch of this.loot.chests) {
+      if (!near(ch.pos)) continue;
+      ch.pos.y = this.collision.groundHeight(ch.pos.x, ch.pos.z, ch.pos.y + 0.2, 0.3);
+      ch.mesh.position.y = ch.pos.y;
+    }
+  }
+
   // ------------------------------------------------------------ main loop
 
   loop() {
@@ -453,6 +477,8 @@ export class Game {
     }
     if (this.spectate && !this.spectate.alive) this.spectate = this.fighters.find((f) => f.alive && !f.isPlayer) || null;
 
+    if (this.mapDirty && this.mapDirty.length) this.settleAfterBreak();
+    this.world.brokenThisFrame = 0;
     this.builds.update(dt);
     this.loot.update(dt, this.time, this.player.alive ? this.player.pos : this.camera.position);
     this.world.update(dt, this.time, this.focusHarvest);

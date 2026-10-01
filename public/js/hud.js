@@ -6,6 +6,70 @@ import { iconSVG } from './icons.js';
 
 const $ = (s) => document.querySelector(s);
 
+// Reticles drawn twice: dark outline under a white line so they read on any
+// background. Coordinates are in a 200x200 box centred on the screen centre.
+function reticleSVG(kind, gap) {
+  const C = 100;
+  const g = Math.min(80, gap);
+  let d = '', circles = '', dots = '';
+  const line = (x1, y1, x2, y2) => { d += `M${x1} ${y1}L${x2} ${y2}`; };
+  switch (kind) {
+    case 'ar':
+      line(C, C - g - 9, C, C - g); line(C, C + g, C, C + g + 9);
+      line(C - g - 9, C, C - g, C); line(C + g, C, C + g + 9, C);
+      dots = `<circle cx="${C}" cy="${C}" r="1.6"/>`;
+      break;
+    case 'smg':
+      // Four short ticks plus corner pips for a busier spray reticle.
+      line(C, C - g - 6, C, C - g); line(C, C + g, C, C + g + 6);
+      line(C - g - 6, C, C - g, C); line(C + g, C, C + g + 6, C);
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) dots += `<circle cx="${C + sx * (g * 0.72 + 3)}" cy="${C + sy * (g * 0.72 + 3)}" r="1.4"/>`;
+      dots += `<circle cx="${C}" cy="${C}" r="1.4"/>`;
+      break;
+    case 'pump':
+      // Spread circle with four outward ticks.
+      circles = `<circle cx="${C}" cy="${C}" r="${g}"/>`;
+      line(C, C - g - 7, C, C - g - 1); line(C, C + g + 1, C, C + g + 7);
+      line(C - g - 7, C, C - g - 1, C); line(C + g + 1, C, C + g + 7, C);
+      dots = `<circle cx="${C}" cy="${C}" r="1.6"/>`;
+      break;
+    case 'pistol':
+      // Open-top chevron.
+      line(C - g - 8, C, C - g, C); line(C + g, C, C + g + 8, C);
+      line(C, C + g, C, C + g + 8);
+      line(C - 5, C + 4, C, C); line(C, C, C + 5, C + 4);
+      break;
+    case 'sniper':
+      // Hip-fire: long thin crosshair with a wide gap and a centre ring.
+      line(C, C - g - 22, C, C - g); line(C, C + g, C, C + g + 22);
+      line(C - g - 22, C, C - g, C); line(C + g, C, C + g + 22, C);
+      circles = `<circle cx="${C}" cy="${C}" r="4"/>`;
+      break;
+    case 'rocket': {
+      // Corner brackets with a drop tick below the centre.
+      const b = g + 10, k = 7;
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        line(C + sx * b, C + sy * (b - k), C + sx * b, C + sy * b);
+        line(C + sx * b, C + sy * b, C + sx * (b - k), C + sy * b);
+      }
+      line(C - 4, C + 10, C + 4, C + 10);
+      dots = `<circle cx="${C}" cy="${C}" r="2"/>`;
+      break;
+    }
+    case 'pickaxe':
+      circles = `<circle cx="${C}" cy="${C}" r="7"/>`;
+      dots = `<circle cx="${C}" cy="${C}" r="1.6"/>`;
+      break;
+    case 'build':
+      d = `M${C - 7} ${C - 7}H${C + 7}V${C + 7}H${C - 7}Z`;
+      break;
+    default:
+      dots = `<circle cx="${C}" cy="${C}" r="2.2"/>`;
+  }
+  const shape = (stroke, sw, fill) => `<g fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"><path d="${d}"/>${circles}</g><g fill="${fill}" stroke="${stroke === '#fff' ? 'none' : stroke}" stroke-width="${sw - 1.8}">${dots}</g>`;
+  return `<svg viewBox="0 0 200 200" width="200" height="200">${shape('rgba(0,0,0,.7)', 3.6, 'rgba(0,0,0,.7)')}${shape('#fff', 1.8, '#fff')}</svg>`;
+}
+
 export class HUD {
   constructor() {
     this.root = $('#hud');
@@ -144,13 +208,14 @@ export class HUD {
       gap = 4 + s * 500 + this.kickV * 6;
     }
     gap = Math.round(gap);
-    if (this.cache.gap !== gap) {
-      this.cache.gap = gap;
-      const [t, b, l, r] = this.crosshair.querySelectorAll('i');
-      t.style.top = `${-gap - 8}px`; b.style.top = `${gap}px`;
-      l.style.left = `${-gap - 8}px`; r.style.left = `${gap}px`;
+    // Each weapon type gets its own reticle shape; the gap tracks spread.
+    let kind = w ? w.type : (p.selected === 0 ? 'pickaxe' : 'item');
+    if (c.buildMode || c.editMode) kind = 'build';
+    const rk = `${kind}:${gap}`;
+    if (this.cache.reticle !== rk) {
+      this.cache.reticle = rk;
+      this.crosshair.innerHTML = reticleSVG(kind, gap);
     }
-    this.set('xh', this.crosshair, c.buildMode || c.editMode ? 'build' : '', 'className');
     this.set('scope', this.scope, c.scoped ? 'on' : '', 'className');
     this.crosshair.style.display = c.scoped || p.state !== 'ground' || !p.alive ? 'none' : 'block';
 

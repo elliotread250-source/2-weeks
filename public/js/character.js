@@ -42,13 +42,27 @@ export function gunMesh(type, rarity) {
 
 function pickaxeMesh() {
   const g = new THREE.Group();
-  const handle = box(0.07, 0.07, 1.0, '#8d6e63');
-  handle.position.z = -0.35;
-  const head = box(0.08, 0.6, 0.12, '#9ad0ec');
-  head.position.set(0, 0, -0.8);
-  const tip = box(0.06, 0.14, 0.1, '#e3f4ff');
-  tip.position.set(0, 0.34, -0.8);
-  g.add(handle, head, tip);
+  const handle = box(0.08, 0.08, 1.15, '#8d5a3b');
+  handle.position.z = -0.4;
+  const wrap = box(0.1, 0.1, 0.22, '#2c3e50');
+  wrap.position.z = -0.05;
+  const collar = box(0.14, 0.16, 0.16, '#5d6d7e');
+  collar.position.z = -0.95;
+  // Curved head: two angled blades meeting at the collar.
+  const bladeA = box(0.07, 0.42, 0.12, '#9ad0ec');
+  bladeA.position.set(0, 0.22, -0.92);
+  bladeA.rotation.x = 0.35;
+  const bladeB = box(0.07, 0.42, 0.12, '#9ad0ec');
+  bladeB.position.set(0, -0.22, -0.92);
+  bladeB.rotation.x = -0.35;
+  const tipA = box(0.05, 0.12, 0.08, '#e9f7ff');
+  tipA.position.set(0, 0.45, -0.85);
+  tipA.rotation.x = 0.6;
+  const tipB = box(0.05, 0.12, 0.08, '#e9f7ff');
+  tipB.position.set(0, -0.45, -0.85);
+  tipB.rotation.x = -0.6;
+  g.add(handle, wrap, collar, bladeA, bladeB, tipA, tipB);
+  g.scale.setScalar(1.15);
   return g;
 }
 
@@ -174,6 +188,7 @@ export class Fighter {
     this.bloom = 0;
     this.heal = null;
     this.swingT = 0;
+    this.pendingSwing = null;
     this.walkPhase = 0;
     this.flash = 0;
     this.lastHitBy = null;
@@ -323,10 +338,25 @@ export class Fighter {
     // Arms: aim the gun along pitch, or swing the pickaxe.
     m.armL.rotation.set(0, 0, 0);
     m.armR.rotation.set(0, 0, 0);
+    m.hips.rotation.set(0, 0, 0);
     if (this.selected === 0) {
-      const sw = this.swingT > 0 ? Math.sin((1 - this.swingT / 0.35) * Math.PI) : 0;
-      m.armR.rotation.x = 0.6 + sw * 1.9 + (this.swingT > 0 ? 0 : s * 0.3);
-      m.armL.rotation.x = -s * 0.5;
+      if (this.swingT > 0) {
+        // Wind up over the shoulder, chop down hard, then recover.
+        const t = 1 - this.swingT / 0.42;
+        const ease = (a, b, k) => a + (b - a) * (k * k * (3 - 2 * k));
+        let arm, twist, lean;
+        if (t < 0.3) { const k = t / 0.3; arm = ease(0.7, 3.3, k); twist = ease(0, 0.4, k); lean = ease(0, -0.12, k); }
+        else if (t < 0.45) { const k = (t - 0.3) / 0.15; arm = 3.3 + (-0.2 - 3.3) * k; twist = 0.4 + (-0.3 - 0.4) * k; lean = -0.12 + (0.22 + 0.12) * k; }
+        else { const k = (t - 0.45) / 0.55; arm = ease(-0.2, 0.7, k); twist = ease(-0.3, 0, k); lean = ease(0.22, 0, k); }
+        m.armR.rotation.x = arm;
+        m.armL.rotation.x = arm * 0.85;
+        m.armL.rotation.z = -0.35;
+        m.hips.rotation.y = twist;
+        m.hips.rotation.x = lean;
+      } else {
+        m.armR.rotation.x = 0.7 + s * 0.3;
+        m.armL.rotation.x = -s * 0.5;
+      }
     } else {
       const aim = Math.PI / 2 + this.pitch;
       m.armR.rotation.x = aim;

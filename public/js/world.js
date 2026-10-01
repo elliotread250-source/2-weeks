@@ -11,16 +11,36 @@ import { weakPointTexture } from './textures.js';
 const R = mapRand;
 const rr = (a, b) => a + R() * (b - a);
 
-// Collects static boxes into one merged, vertex-coloured mesh (one draw call
-// for every building on the island) and registers their colliders.
+// Collects static geometry into one merged, vertex-coloured mesh (one draw
+// call for the whole island). Every wall, floor, roof and stair is split into
+// chunks that each own a slice of that mesh and a collider, so any of them can
+// be destroyed. Only the terrain itself is unbreakable.
+const MAX_SPAN = 2.6; // wall chunk width
+const MAX_SLAB = 5; // floor/roof chunk size
+const MAX_RISE = 4.5; // chunk height
+
 class StaticBuilder {
   constructor(collision) {
     this.col = collision;
     this.geos = [];
+    this.owners = [];
+    this.elements = [];
     this.tmpColor = new THREE.Color();
+    this.mat = 'brick'; // material that breaking the next pieces gives
   }
 
-  pushGeo(g, color, jitter = 0.04) {
+  element(mat, volume) {
+    const base = { wood: 140, brick: 220, metal: 320 }[mat];
+    const el = {
+      id: this.elements.length, mat, ranges: [], colliders: [], dead: false,
+      hp: Math.round(base * Math.min(2.4, Math.max(0.45, volume / 6))),
+    };
+    el.maxHp = el.hp;
+    this.elements.push(el);
+    return el;
+  }
+
+  pushGeo(g, color, jitter = 0.04, owner = null) {
     g.deleteAttribute('uv');
     const ng = g.index ? g.toNonIndexed() : g;
     const c = this.tmpColor.set(color);
@@ -32,14 +52,56 @@ class StaticBuilder {
     }
     ng.setAttribute('color', new THREE.BufferAttribute(arr, 3));
     this.geos.push(ng);
+    this.owners.push(owner);
   }
 
-  box(x0, y0, z0, x1, y1, z1, color, collide = true) {
+  addCollider(el, c) {
+    c.owner = el;
+    el.colliders.push(this.col.add(c));
+    if (!el.min) {
+      el.min = { ...c.min };
+      el.max = { ...c.max };
+    } else {
+      for (const a of ['x', 'y', 'z']) {
+        el.min[a] = Math.min(el.min[a], c.min[a]);
+        el.max[a] = Math.max(el.max[a], c.max[a]);
+      }
+    }
+  }
+
+  // Axis-aligned block, chopped into breakable chunks.
+  box(x0, y0, z0, x1, y1, z1, color, collide = true, mat = this.mat) {
     if (x1 - x0 < 0.01 || y1 - y0 < 0.01 || z1 - z0 < 0.01) return;
-    const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
-    g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-    this.pushGeo(g, color);
-    if (collide) this.col.add(makeBox(x0, y0, z0, x1, y1, z1, 'static', null));
+    const w = x1 - x0, h = y1 - y0, d = z1 - z0;
+    if (h < 0.06 || !collide) {
+      // Paint-thin decals (court lines) stay decorative.
+      if (h < 0.06) {
+        const g = new THREE.BoxGeometry(w, h, d);
+        g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+        this.pushGeo(g, color);
+        return;
+      }
+    }
+    const slab = h < 0.6;
+    const spanX = slab ? MAX_SLAB : (d < 1.2 ? MAX_SPAN : MAX_SLAB);
+    const spanZ = slab ? MAX_SLAB : (w < 1.2 ? MAX_SPAN : MAX_SLAB);
+    const nx = Math.max(1, Math.round(w / spanX));
+    const nz = Math.max(1, Math.round(d / spanZ));
+    const ny = Math.max(1, Math.round(h / MAX_RISE));
+    for (let ix = 0; ix < nx; ix++) {
+      for (let iy = 0; iy < ny; iy++) {
+        for (let iz = 0; iz < nz; iz++) {
+          const ax = x0 + (w * ix) / nx, bx = x0 + (w * (ix + 1)) / nx;
+          const ay = y0 + (h * iy) / ny, by = y0 + (h * (iy + 1)) / ny;
+          const az = z0 + (d * iz) / nz, bz = z0 + (d * (iz + 1)) / nz;
+          const el = this.element(mat, (bx - ax) * (by - ay) * (bz - az) + (bx - ax) * (bz - az) * 0.4 + (bx - ax) * (by - ay) * 0.4 + (by - ay) * (bz - az) * 0.4);
+          const g = new THREE.BoxGeometry(bx - ax, by - ay, bz - az);
+          g.translate((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
+          this.pushGeo(g, color, 0.04, el);
+          this.addCollider(el, makeBox(ax, ay, az, bx, by, bz, 'static', el));
+        }
+      }
+    }
   }
 
   // Stair ramp rising along +z from (zLow, y) to (zLow + run, y + rise).
@@ -48,12 +110,13 @@ class StaticBuilder {
     const g = new THREE.BoxGeometry(x1 - x0, 0.25, len);
     g.rotateX(-Math.atan2(rise, run));
     g.translate((x0 + x1) / 2, y + rise / 2 - 0.12, zLow + run / 2);
-    this.pushGeo(g, color);
+    const el = this.element('wood', 8);
+    this.pushGeo(g, color, 0.04, el);
     const hf = (x, z) => {
       if (x < x0 || x > x1 || z < zLow || z > zLow + run) return null;
       return y + (rise * (z - zLow)) / run;
     };
-    this.col.add(makeSlope(x0, y, zLow, x1, y + rise, zLow + run, hf, 'static', null));
+    this.addCollider(el, makeSlope(x0, y, zLow, x1, y + rise, zLow + run, hf, 'static', el));
   }
 
   // Four-sided pyramid roof with a matching walkable slope collider.
@@ -68,36 +131,58 @@ class StaticBuilder {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.computeVertexNormals();
-    this.pushGeo(g, color, 0);
+    const el = this.element('wood', ((x1 - x0) * (z1 - z0)) / 6);
+    this.pushGeo(g, color, 0, el);
     const hw = (x1 - x0) / 2, hd = (z1 - z0) / 2;
     const hf = (x, z) => {
       if (x < x0 || x > x1 || z < z0 || z > z1) return null;
       const k = Math.max(Math.abs(x - cx) / hw, Math.abs(z - cz) / hd);
       return y + rise * (1 - k);
     };
-    this.col.add(makeSlope(x0, y, z0, x1, y + rise, z1, hf, 'static', null));
+    this.addCollider(el, makeSlope(x0, y, z0, x1, y + rise, z1, hf, 'static', el));
   }
 
+  // Cylinders (tanks, chimneys, poles) are stacked in breakable rings.
   cylinder(x, y, z, r, h, color, collide = true, seg = 10) {
-    const g = new THREE.CylinderGeometry(r, r, h, seg);
-    g.translate(x, y + h / 2, z);
-    this.pushGeo(g, color);
-    if (collide) this.col.add(makeBox(x - r * 0.85, y, z - r * 0.85, x + r * 0.85, y + h, z + r * 0.85, 'static', null));
+    const n = Math.max(1, Math.round(h / MAX_RISE));
+    for (let i = 0; i < n; i++) {
+      const sh = h / n, sy = y + i * sh;
+      const g = new THREE.CylinderGeometry(r, r, sh, seg);
+      g.translate(x, sy + sh / 2, z);
+      const el = this.element('metal', Math.PI * r * r * sh * 0.5 + 1);
+      this.pushGeo(g, color, 0.04, el);
+      const rr2 = Math.max(0.12, r * 0.85);
+      this.addCollider(el, makeBox(x - rr2, sy, z - rr2, x + rr2, sy + sh, z + rr2, 'static', el));
+    }
   }
 
   sphere(x, y, z, r, color) {
     const g = new THREE.IcosahedronGeometry(r, 1);
     g.translate(x, y, z);
-    this.pushGeo(g, color);
+    const el = this.element('metal', r * r * 2);
+    this.pushGeo(g, color, 0.04, el);
+    this.addCollider(el, makeBox(x - r * 0.8, y - r * 0.8, z - r * 0.8, x + r * 0.8, y + r * 0.8, z + r * 0.8, 'static', el));
   }
 
   finish() {
+    // Record which vertex range of the merged mesh belongs to which chunk.
+    let offset = 0;
+    this.geos.forEach((g, i) => {
+      const n = g.attributes.position.count;
+      const el = this.owners[i];
+      if (el) el.ranges.push([offset, n]);
+      offset += n;
+    });
     const merged = mergeGeometries(this.geos, false);
     merged.computeBoundingSphere();
+    merged.attributes.position.setUsage(THREE.DynamicDrawUsage);
     const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
     this.geos = [];
+    this.owners = [];
+    this.mesh = mesh;
     return mesh;
   }
 }
@@ -508,6 +593,82 @@ export class World {
     h.weak = null;
   }
 
+  // ---------------------------------------------------------------- destruction
+
+  // Damage a chunk of the map. Returns true if it broke.
+  damageStatic(el, dmg) {
+    if (el.dead) return false;
+    el.hp -= dmg;
+    if (el.hp > 0) return false;
+    this.destroyStatic(el);
+    this.collapseAround(el);
+    return true;
+  }
+
+  destroyStatic(el) {
+    if (el.dead) return;
+    el.dead = true;
+    for (const c of el.colliders) this.col.remove(c);
+    const attr = this.sb.mesh.geometry.attributes.position;
+    for (const [start, count] of el.ranges) {
+      attr.array.fill(0, start * 3, (start + count) * 3);
+      attr.addUpdateRange(start * 3, count * 3);
+    }
+    attr.needsUpdate = true;
+    this.brokenThisFrame = (this.brokenThisFrame || 0) + 1;
+    if (this.onStaticDestroyed) this.onStaticDestroyed(el);
+  }
+
+  grounded(el) {
+    const y = el.min.y;
+    const pts = [
+      [el.min.x + 0.05, el.min.z + 0.05], [el.max.x - 0.05, el.min.z + 0.05],
+      [el.min.x + 0.05, el.max.z - 0.05], [el.max.x - 0.05, el.max.z - 0.05],
+      [(el.min.x + el.max.x) / 2, (el.min.z + el.max.z) / 2],
+    ];
+    return pts.some(([x, z]) => terrainHeight(x, z) >= y - 0.35);
+  }
+
+  neighbours(el) {
+    const e = 0.06;
+    const out = [];
+    const list = this.col.query(el.min.x - e, el.min.z - e, el.max.x + e, el.max.z + e);
+    for (const c of list) {
+      const o = c.owner;
+      if (c.kind !== 'static' || !o || o === el || o.dead || o.ranges === undefined) continue;
+      if (c.min.y > el.max.y + e || c.max.y < el.min.y - e) continue;
+      if (!out.includes(o)) out.push(o);
+    }
+    return out;
+  }
+
+  // Anything that was hanging off the broken chunk and no longer connects to
+  // the ground falls apart, like Fortnite's structural integrity.
+  collapseAround(broken) {
+    const seeds = this.neighbours({ ...broken, dead: false, ranges: [] });
+    const checked = new Set();
+    for (const seed of seeds) {
+      if (seed.dead || checked.has(seed)) continue;
+      const visited = new Set([seed]);
+      const queue = [seed];
+      let supported = false;
+      while (queue.length && !supported) {
+        const el = queue.shift();
+        if (this.grounded(el)) { supported = true; break; }
+        if (visited.size > 600) { supported = true; break; } // big structure: assume it stands
+        for (const n of this.neighbours(el)) {
+          if (!visited.has(n)) { visited.add(n); queue.push(n); }
+        }
+      }
+      for (const v of visited) checked.add(v);
+      if (!supported) {
+        for (const v of visited) {
+          this.destroyStatic(v);
+        }
+      }
+    }
+  }
+
   update(dt, time, focusHarvest) {
     for (let i = this.shaking.length - 1; i >= 0; i--) {
       const h = this.shaking[i];
@@ -537,6 +698,7 @@ export class World {
   // ---------------------------------------------------------------- POIs
 
   buildPrison() {
+    this.sb.mat = 'brick';
     // Rebirth's landmark: a hilltop cell block inside a walled yard.
     const cx = 0, cz = -15;
     this.building({ x: cx, z: cz - 12, w: 46, d: 18, floors: 3, color: '#cfc8b8', trim: '#8a8172', roofColor: '#7d776d', doors: ['s', 'e', 'w'], poi: 'prison' });
@@ -556,6 +718,7 @@ export class World {
   }
 
   buildControl() {
+    this.sb.mat = 'brick';
     const p = POIS.find((q2) => q2.id === 'control');
     this.building({ x: p.x, z: p.z, w: 26, d: 16, floors: 2, color: '#e3ddd0', trim: '#5c6f7b', roofColor: '#536470', doors: ['n', 's'], poi: 'control' });
     const b = this.buildings[this.buildings.length - 1];
@@ -567,6 +730,7 @@ export class World {
   }
 
   buildBio() {
+    this.sb.mat = 'metal';
     const p = POIS.find((q2) => q2.id === 'bio');
     this.building({ x: p.x, z: p.z, w: 24, d: 16, floors: 3, color: '#f0f2f2', trim: '#2f6fb3', roofColor: '#9aa7b0', upperColor: '#e6ebee', doors: ['s', 'w'], poi: 'bio' });
     this.building({ x: p.x - 20, z: p.z + 14, w: 12, d: 12, floors: 1, color: '#e9eef0', trim: '#2f6fb3', doors: ['e'], poi: 'bio' });
@@ -578,6 +742,7 @@ export class World {
   }
 
   buildChem() {
+    this.sb.mat = 'brick';
     const p = POIS.find((q2) => q2.id === 'chem');
     this.building({ x: p.x + 4, z: p.z, w: 24, d: 14, floors: 2, color: '#d9d2bf', trim: '#a0522d', roofColor: '#6f6457', doors: ['s', 'e'], poi: 'chem' });
     const g = this.ground(p.x - 14, p.z + 12);
@@ -590,6 +755,7 @@ export class World {
   }
 
   buildFactory() {
+    this.sb.mat = 'brick';
     const p = POIS.find((q2) => q2.id === 'factory');
     this.building({ x: p.x, z: p.z, w: 36, d: 22, floors: 1, fh: 8, color: '#b45d3a', trim: '#5a5a5a', roofColor: '#5d6d7e', doors: ['e', 'w', 's'], poi: 'factory' });
     const g = this.ground(p.x, p.z);
@@ -608,10 +774,12 @@ export class World {
   }
 
   buildHarbor() {
+    this.sb.mat = 'brick';
     const p = POIS.find((q2) => q2.id === 'harbor');
     const g = this.ground(p.x, p.z);
     this.building({ x: p.x + 8, z: p.z - 10, w: 18, d: 12, floors: 1, fh: 6, color: '#5d8aa8', trim: '#34495e', roofColor: '#2c3e50', doors: ['s', 'w'], poi: 'harbor' });
     // Wooden docks reaching out into the bay.
+    this.sb.mat = 'wood';
     for (const [dx, len] of [[-14, 30], [0, 24], [14, 34]]) {
       this.sb.box(p.x + dx - 2.5, g - 0.3, p.z + 10, p.x + dx + 2.5, g + 0.1, p.z + 10 + len, '#a0703f');
       for (let k = 0; k <= len; k += 6) {
@@ -630,11 +798,13 @@ export class World {
       }
     }
     // Dock crane.
+    this.sb.mat = 'metal';
     this.sb.box(p.x + 20, g, p.z + 4, p.x + 21.2, g + 18, p.z + 5.2, '#f1c40f');
     this.sb.box(p.x + 20.6 - 1, g + 17, p.z - 4, p.x + 20.6 + 1, g + 18.2, p.z + 26, '#f1c40f', false);
   }
 
   buildLiving() {
+    this.sb.mat = 'wood';
     // Pleasant Park energy: a ring of colourful two-storey houses.
     const p = POIS.find((q2) => q2.id === 'living');
     const roofs = ['#e74c3c', '#2e86de', '#27ae60', '#f39c12', '#8e44ad', '#16a085'];
@@ -654,6 +824,7 @@ export class World {
   }
 
   buildHQ() {
+    this.sb.mat = 'metal';
     const p = POIS.find((q2) => q2.id === 'hq');
     this.building({ x: p.x, z: p.z, w: 24, d: 18, floors: 3, color: '#cdd5da', trim: '#2c3e50', roofColor: '#4b5563', upperColor: '#b9c6cf', doors: ['w', 's'], poi: 'hq' });
     const b = this.buildings[this.buildings.length - 1];
@@ -663,6 +834,7 @@ export class World {
   }
 
   buildDecon() {
+    this.sb.mat = 'metal';
     const p = POIS.find((q2) => q2.id === 'decon');
     for (const [dx, dz] of [[-10, -6], [6, -8], [-4, 10]]) {
       const x = p.x + dx, z = p.z + dz, g = this.ground(x, z);
@@ -683,6 +855,7 @@ export class World {
   }
 
   buildShore() {
+    this.sb.mat = 'wood';
     const p = POIS.find((q2) => q2.id === 'shore');
     const huts = ['#f8c471', '#76d7c4', '#f1948a'];
     [-14, 0, 14].forEach((dx, i) => {
@@ -701,6 +874,7 @@ export class World {
   }
 
   buildSecurity() {
+    this.sb.mat = 'metal';
     const p = POIS.find((q2) => q2.id === 'security');
     this.building({ x: p.x, z: p.z, w: 18, d: 12, floors: 2, color: '#a9b7c0', trim: '#2f3e46', roofColor: '#3d4b53', doors: ['s', 'e'], poi: 'security' });
     this.building({ x: p.x + 18, z: p.z + 10, w: 6, d: 6, floors: 1, color: '#f4d03f', trim: '#2f3e46', doors: ['w'], windows: true, roofAccess: false, poi: 'security' });
@@ -711,6 +885,7 @@ export class World {
   }
 
   buildConstruction() {
+    this.sb.mat = 'metal';
     const p = POIS.find((q2) => q2.id === 'construction');
     this.building({ x: p.x, z: p.z, w: 20, d: 14, floors: 3, color: '#b0a89a', trim: '#8c857a', floorColor: '#9e978b', roofColor: '#9e978b', walls: false, parapet: false, poi: 'construction' });
     const g = this.ground(p.x, p.z);
@@ -723,6 +898,7 @@ export class World {
   }
 
   buildLighthouse() {
+    this.sb.mat = 'brick';
     const x = -170, z = -70;
     const g = this.ground(x, z);
     if (g < 1) return;

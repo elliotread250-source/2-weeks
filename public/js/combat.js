@@ -74,6 +74,10 @@ export class Combat {
       if (!f.alive) continue;
       f.fireCd = Math.max(0, f.fireCd - dt);
       f.swingT = Math.max(0, f.swingT - dt);
+      if (f.pendingSwing) {
+        f.pendingSwing.t -= dt;
+        if (f.pendingSwing.t <= 0) this.resolveSwing(f);
+      }
       f.bloom = Math.max(0, f.bloom - dt * 0.12);
       if (f.reloadT > 0) {
         f.reloadT -= dt;
@@ -164,6 +168,9 @@ export class Combat {
     if (c && c.kind === 'build') {
       fx.burst(hit.point, c.owner.mat === 'wood' ? '#a0703f' : c.owner.mat === 'brick' ? '#b0533a' : '#9aa5b1', 3, 3);
       this.game.builds.damage(c.owner, dmg);
+    } else if (c && c.kind === 'static' && c.owner) {
+      fx.burst(hit.point, c.owner.mat === 'wood' ? '#a0703f' : c.owner.mat === 'brick' ? '#b9b0a2' : '#b0bec5', 3, 2.5, 0.7);
+      this.game.world.damageStatic(c.owner, dmg);
     } else if (c && c.kind === 'harvest') {
       fx.burst(hit.point, '#7a5a3a', 3, 3);
     } else {
@@ -213,6 +220,17 @@ export class Combat {
       const d = Math.hypot(cx - p.x, piece.baseY + 1.8 - p.y, cz - p.z);
       if (d < r.splash + 2.5) builds.damage(piece, r.structure);
     }
+    // The map breaks too.
+    const R = r.splash;
+    const hitEls = new Set();
+    for (const c of this.col.query(p.x - R, p.z - R, p.x + R, p.z + R)) {
+      if (c.kind !== 'static' || !c.owner || c.owner.dead) continue;
+      const cx = Math.max(c.min.x, Math.min(p.x, c.max.x));
+      const cy = Math.max(c.min.y, Math.min(p.y, c.max.y));
+      const cz = Math.max(c.min.z, Math.min(p.z, c.max.z));
+      if (Math.hypot(cx - p.x, cy - p.y, cz - p.z) < R) hitEls.add(c.owner);
+    }
+    for (const el of hitEls) this.game.world.damageStatic(el, r.structure);
     for (const f of this.game.fighters) {
       if (!f.alive || f.state === 'bus') continue;
       const c = f.pos.clone().add(new THREE.Vector3(0, 1, 0));
@@ -226,24 +244,44 @@ export class Combat {
 
   // ---------------------------------------------------------------- pickaxe
 
+  // Start a swing. The hit lands when the pickaxe comes down, not on click.
   swing(f, origin, dir) {
-    if (f.fireCd > 0) return null;
+    if (f.fireCd > 0 || f.pendingSwing) return null;
     f.fireCd = PICKAXE.cooldown;
-    f.swingT = 0.35;
+    f.swingT = 0.42;
     f.heal = null;
+    f.pendingSwing = { t: 0.17, origin: origin.clone(), dir: dir.clone() };
     sfx('swing', this.volumeFor(f));
+    return true;
+  }
+
+  resolveSwing(f) {
+    const { origin, dir } = f.isPlayer ? this.game.controller.aimRay() : f.pendingSwing;
+    f.pendingSwing = null;
     const hit = this.trace(origin, dir, PICKAXE.range, f);
     if (hit.fighter) {
       this.applyDamage(hit.fighter, PICKAXE.playerDamage, f, { weapon: PICKAXE.name, point: hit.point });
       sfx('pickaxe', this.volumeFor(f));
+      if (f.isPlayer) this.game.hud.kick(0.6);
       return hit;
     }
     if (!hit.world) return null;
     const c = hit.world.collider;
     sfx('pickaxe', this.volumeFor(f));
+    if (f.isPlayer) this.game.hud.kick(0.5);
     if (c && c.kind === 'build') {
       this.game.fx.burst(hit.point, '#c8a165', 4, 3);
+      this.structNumber(f, hit.point, PICKAXE.structureDamage);
       this.game.builds.damage(c.owner, PICKAXE.structureDamage);
+    } else if (c && c.kind === 'static' && c.owner) {
+      // Any piece of the map: walls, floors, roofs, stairs, towers...
+      const el = c.owner;
+      const gained = 6;
+      f.mats[el.mat] = Math.min(999, f.mats[el.mat] + gained);
+      this.game.fx.burst(hit.point, el.mat === 'wood' ? '#a0703f' : el.mat === 'brick' ? '#b9b0a2' : '#b0bec5', 5, 3);
+      this.structNumber(f, hit.point, PICKAXE.structureDamage);
+      this.game.world.damageStatic(el, PICKAXE.structureDamage);
+      if (f.isPlayer) this.game.hud.matGain(el.mat, gained);
     } else if (c && c.kind === 'harvest') {
       const h = this.game.world.harvestables.find((x) => x.collider === c);
       if (h) {
@@ -251,6 +289,7 @@ export class Combat {
         const gained = this.game.world.hitHarvestable(h, hit.point, hit.normal, crit);
         f.mats[h.mat] = Math.min(999, f.mats[h.mat] + gained);
         this.game.fx.burst(hit.point, h.mat === 'wood' ? '#a0703f' : h.mat === 'brick' ? '#9e9e9e' : '#b0bec5', crit ? 8 : 4, 3);
+        this.structNumber(f, hit.point, crit ? 100 : 50, crit);
         if (f.isPlayer) {
           if (crit) sfx('crit');
           this.game.hud.matGain(h.mat, gained);
@@ -261,6 +300,11 @@ export class Combat {
       this.game.fx.burst(hit.point, '#9e9e9e', 2, 2, 0.6);
     }
     return hit;
+  }
+
+  structNumber(f, point, dmg, crit = false) {
+    if (!f.isPlayer) return;
+    this.game.fx.damageNumber(new THREE.Vector3(point.x, point.y, point.z), dmg, crit ? 'head' : 'struct');
   }
 
   // ---------------------------------------------------------------- healing
