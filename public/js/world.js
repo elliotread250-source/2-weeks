@@ -53,6 +53,7 @@ class StaticBuilder {
     ng.setAttribute('color', new THREE.BufferAttribute(arr, 3));
     this.geos.push(ng);
     this.owners.push(owner);
+    if (owner) { owner.color = new THREE.Color(color).multiplyScalar(k); owner.hex = color; }
   }
 
   addCollider(el, c) {
@@ -176,6 +177,7 @@ class StaticBuilder {
     const merged = mergeGeometries(this.geos, false);
     merged.computeBoundingSphere();
     merged.attributes.position.setUsage(THREE.DynamicDrawUsage);
+    merged.attributes.color.setUsage(THREE.DynamicDrawUsage);
     const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -228,6 +230,8 @@ export class World {
     this.lootSpots = [];
     this.harvestables = [];
     this.shaking = [];
+    this.pending = [];
+    this.time = 0;
     this.buildings = [];
   }
 
@@ -595,17 +599,34 @@ export class World {
 
   // ---------------------------------------------------------------- destruction
 
-  // Damage a chunk of the map. Returns true if it broke.
+  // Damage a chunk of the map. It darkens and cracks as it weakens, then
+  // shatters. Returns true if it broke.
   damageStatic(el, dmg) {
-    if (el.dead) return false;
+    if (el.dead || el.collapsing) return false;
     el.hp -= dmg;
-    if (el.hp > 0) return false;
-    this.destroyStatic(el);
+    if (el.hp > 0) {
+      this.tintStatic(el, 0.45 + 0.55 * (el.hp / el.maxHp));
+      return false;
+    }
+    this.destroyStatic(el, 'smash');
     this.collapseAround(el);
     return true;
   }
 
-  destroyStatic(el) {
+  tintStatic(el, factor) {
+    const attr = this.sb.mesh.geometry.attributes.color;
+    const c = el.color;
+    if (!c) return;
+    for (const [start, count] of el.ranges) {
+      for (let i = start; i < start + count; i++) {
+        attr.array[i * 3] = c.r * factor; attr.array[i * 3 + 1] = c.g * factor; attr.array[i * 3 + 2] = c.b * factor;
+      }
+      attr.addUpdateRange(start * 3, count * 3);
+    }
+    attr.needsUpdate = true;
+  }
+
+  destroyStatic(el, mode = 'smash') {
     if (el.dead) return;
     el.dead = true;
     for (const c of el.colliders) this.col.remove(c);
@@ -616,7 +637,7 @@ export class World {
     }
     attr.needsUpdate = true;
     this.brokenThisFrame = (this.brokenThisFrame || 0) + 1;
-    if (this.onStaticDestroyed) this.onStaticDestroyed(el);
+    if (this.onStaticDestroyed) this.onStaticDestroyed(el, mode);
   }
 
   grounded(el) {
@@ -635,7 +656,7 @@ export class World {
     const list = this.col.query(el.min.x - e, el.min.z - e, el.max.x + e, el.max.z + e);
     for (const c of list) {
       const o = c.owner;
-      if (c.kind !== 'static' || !o || o === el || o.dead || o.ranges === undefined) continue;
+      if (c.kind !== 'static' || !o || o === el || o.dead || o.collapsing || o.ranges === undefined) continue;
       if (c.min.y > el.max.y + e || c.max.y < el.min.y - e) continue;
       if (!out.includes(o)) out.push(o);
     }
@@ -655,21 +676,36 @@ export class World {
       while (queue.length && !supported) {
         const el = queue.shift();
         if (this.grounded(el)) { supported = true; break; }
-        if (visited.size > 600) { supported = true; break; } // big structure: assume it stands
+        if (visited.size > 3000) { supported = true; break; } // huge structure: assume it stands
         for (const n of this.neighbours(el)) {
           if (!visited.has(n)) { visited.add(n); queue.push(n); }
         }
       }
       for (const v of visited) checked.add(v);
       if (!supported) {
+        // Crumble outward from the break over a second or so, instead of
+        // everything vanishing at once.
+        const bx = (broken.min.x + broken.max.x) / 2, by = (broken.min.y + broken.max.y) / 2, bz = (broken.min.z + broken.max.z) / 2;
         for (const v of visited) {
-          this.destroyStatic(v);
+          v.collapsing = true;
+          const d = Math.hypot((v.min.x + v.max.x) / 2 - bx, (v.min.y + v.max.y) / 2 - by, (v.min.z + v.max.z) / 2 - bz);
+          this.pending.push({ el: v, at: this.time + 0.25 + Math.min(1.6, d * 0.06) + Math.random() * 0.1 });
+          this.tintStatic(v, 0.6);
         }
       }
     }
   }
 
   update(dt, time, focusHarvest) {
+    this.time = time;
+    if (this.pending.length) {
+      for (let i = this.pending.length - 1; i >= 0; i--) {
+        const p = this.pending[i];
+        if (p.at > time) continue;
+        this.pending.splice(i, 1);
+        this.destroyStatic(p.el, 'fall');
+      }
+    }
     for (let i = this.shaking.length - 1; i >= 0; i--) {
       const h = this.shaking[i];
       h.shakeT -= dt;

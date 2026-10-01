@@ -150,6 +150,8 @@ export class BuildSystem {
     this.col = collision;
     this.pieces = new Map();
     this.list = [];
+    this.pending = [];
+    this.time = 0;
     this.onDestroyed = null;
     const tex = getTextures();
     this.mats = {};
@@ -272,7 +274,7 @@ export class BuildSystem {
     p.colliders = [];
     p.group.clear();
     const { geos, cols } = pieceShapes(p, true);
-    const mat = p.built ? this.mats[p.mat] : this.buildingMats[p.mat];
+    const mat = p.dmgMat || (p.built ? this.mats[p.mat] : this.buildingMats[p.mat]);
     for (const g of geos) {
       const m = new THREE.Mesh(g, mat);
       m.castShadow = true;
@@ -302,26 +304,32 @@ export class BuildSystem {
 
   // ------------------------------------------------------------ damage & support
 
-  damage(p, amount) {
-    if (!this.pieces.has(p.key)) return false;
+  damage(p, amount, from = null) {
+    if (!this.pieces.has(p.key) || p.collapsing) return false;
     p.hp -= amount;
-    p.damaged = 0.15;
+    p.shakeT = 0.18;
     if (p.hp <= 0) {
-      this.destroy(p);
-      this.collapseUnsupported();
+      this.destroy(p, 'smash');
+      this.collapseUnsupported(p);
       return true;
     }
+    // Darken as it weakens so you can see a wall is about to go.
+    if (!p.dmgMat) {
+      p.dmgMat = (p.built ? this.mats : this.buildingMats)[p.mat].clone();
+      for (const m of p.group.children) m.material = p.dmgMat;
+    }
+    p.dmgMat.color.setScalar(0.45 + 0.55 * Math.max(0, p.hp / p.maxHp));
     return false;
   }
 
-  destroy(p) {
+  destroy(p, mode = 'smash') {
     if (!this.pieces.has(p.key)) return;
     this.pieces.delete(p.key);
     this.list.splice(this.list.indexOf(p), 1);
     for (const c of p.colliders) this.col.remove(c);
     this.scene.remove(p.group);
     p.dead = true;
-    if (this.onDestroyed) this.onDestroyed(p);
+    if (this.onDestroyed) this.onDestroyed(p, mode);
   }
 
   isGrounded(p) {
@@ -356,29 +364,56 @@ export class BuildSystem {
   }
 
   // Anything not connected to the ground through other builds falls down.
-  collapseUnsupported() {
+  // Anything not connected to the ground through other builds falls down,
+  // crumbling outward from the piece that broke.
+  collapseUnsupported(origin = null) {
     const supported = new Set();
     const queue = [];
-    for (const p of this.list) if (this.isGrounded(p)) { supported.add(p); queue.push(p); }
+    for (const p of this.list) if (!p.collapsing && this.isGrounded(p)) { supported.add(p); queue.push(p); }
     while (queue.length) {
       const p = queue.pop();
       for (const q of this.neighbours(p)) {
-        if (!supported.has(q)) { supported.add(q); queue.push(q); }
+        if (!q.collapsing && !supported.has(q)) { supported.add(q); queue.push(q); }
       }
     }
-    const doomed = this.list.filter((p) => !supported.has(p));
-    for (const p of doomed) this.destroy(p);
+    const doomed = this.list.filter((p) => !supported.has(p) && !p.collapsing);
+    const ox = origin ? origin.gx * T + T / 2 : 0, oz = origin ? origin.gz * T + T / 2 : 0, oy = origin ? origin.baseY : 0;
+    for (const p of doomed) {
+      p.collapsing = true;
+      const d = origin ? Math.hypot(p.gx * T + T / 2 - ox, p.baseY - oy, p.gz * T + T / 2 - oz) : 0;
+      this.pending.push({ p, at: this.time + 0.2 + Math.min(1.5, d * 0.07) + Math.random() * 0.08 });
+      if (!p.dmgMat) {
+        p.dmgMat = (p.built ? this.mats : this.buildingMats)[p.mat].clone();
+        for (const m of p.group.children) m.material = p.dmgMat;
+      }
+      p.dmgMat.color.setScalar(0.55);
+      p.shakeT = 2;
+    }
   }
 
   update(dt) {
+    this.time += dt;
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      if (this.pending[i].at > this.time) continue;
+      const { p } = this.pending[i];
+      this.pending.splice(i, 1);
+      this.destroy(p, 'fall');
+    }
     for (const p of this.list) {
-      if (!p.built) {
+      if (!p.built && !p.collapsing) {
         p.hp = Math.min(p.maxHp, p.hp + p.rate * dt);
         p.buildT = (p.buildT || 0) + dt;
         if (p.hp >= p.maxHp || p.buildT > MATERIALS[p.mat].time) {
           p.built = true;
-          for (const m of p.group.children) m.material = this.mats[p.mat];
+          if (p.dmgMat) { p.dmgMat.transparent = false; p.dmgMat.opacity = 1; p.dmgMat.needsUpdate = true; }
+          else for (const m of p.group.children) m.material = this.mats[p.mat];
         }
+      }
+      if (p.shakeT > 0) {
+        p.shakeT -= dt;
+        const a = p.collapsing ? 0.05 : Math.max(0, p.shakeT) * 0.4;
+        p.group.position.set((Math.random() - 0.5) * a, (Math.random() - 0.5) * a * 0.5, (Math.random() - 0.5) * a);
+        if (p.shakeT <= 0) p.group.position.set(0, 0, 0);
       }
     }
   }

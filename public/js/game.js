@@ -7,7 +7,7 @@ import {
 import { CollisionWorld } from './collision.js';
 import { terrainHeight, POIS } from './terrain.js';
 import { World } from './world.js';
-import { BuildSystem } from './building.js';
+import { BuildSystem, pieceAABB } from './building.js';
 import { LootSystem } from './loot.js';
 import { Fighter, OUTFITS } from './character.js';
 import { BotBrain } from './bot.js';
@@ -124,25 +124,27 @@ export class Game {
     this.world = new World(scene, this.collision);
     this.world.build();
     this.builds = new BuildSystem(scene, this.collision);
-    this.builds.onDestroyed = (p) => {
-      const c = new THREE.Vector3(p.gx * 5 + 2.5, p.baseY + 1.5, p.gz * 5 + 2.5);
-      this.fx.burst(c, p.mat === 'wood' ? '#a0703f' : p.mat === 'brick' ? '#b0533a' : '#9aa5b1', 10, 5, 2);
-      sfx('buildBreak', Math.max(0.05, 1 - c.distanceTo(this.player.pos) / 120));
+    this.builds.onDestroyed = (p, mode) => {
+      const bb = pieceAABB(p);
+      const min = { x: bb.min[0], y: bb.min[1], z: bb.min[2] }, max = { x: bb.max[0], y: bb.max[1], z: bb.max[2] };
+      this.fx.shatter(min, max, this.builds.mats[p.mat], { fall: mode === 'fall' });
+      const c = new THREE.Vector3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
+      sfx('buildBreak', Math.max(0.05, 1 - c.distanceTo(this.player.pos) / 120) * (mode === 'fall' ? 0.6 : 1));
     };
-    // Breaking any chunk of the map: debris, sound, and anything resting on
-    // it (player builds, loot, chests) settles or falls.
-    this.world.onStaticDestroyed = (el) => {
+    // Breaking any chunk of the map: it shatters into tumbling debris, and
+    // anything resting on it (player builds, loot, chests) settles or falls.
+    this.world.onStaticDestroyed = (el, mode) => {
       const c = new THREE.Vector3((el.min.x + el.max.x) / 2, (el.min.y + el.max.y) / 2, (el.min.z + el.max.z) / 2);
-      if ((this.world.brokenThisFrame || 0) < 12) {
-        this.fx.burst(c, el.mat === 'wood' ? '#a0703f' : el.mat === 'brick' ? '#c9c0b0' : '#9aa5b1', 6, 5, 2);
-        if (this.world.brokenThisFrame < 3) sfx('buildBreak', Math.max(0.05, 1 - c.distanceTo(this.player.pos) / 120));
-      }
+      const n = this.world.brokenThisFrame || 0;
+      if (n < 40) this.fx.shatter(el.min, el.max, el.hex || '#bbbbbb', { fall: mode === 'fall' });
+      if (n < 3) sfx('buildBreak', Math.max(0.05, 1 - c.distanceTo(this.player.pos) / 120) * (mode === 'fall' ? 0.7 : 1));
       this.mapDirty = this.mapDirty || [];
       this.mapDirty.push(el);
     };
     this.loot = new LootSystem(scene, this.collision);
     this.loot.spawnFromSpots(this.world.lootSpots);
     this.fx = new FX(scene, this.camera, document.getElementById('numbers'));
+    this.fx.groundFn = (x, z, y) => this.collision.groundHeight(x, z, y, 0.05);
     this.hud = new HUD();
     this.storm = new Storm(scene);
     this.combat = new Combat(this);
