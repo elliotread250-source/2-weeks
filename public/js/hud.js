@@ -2,6 +2,7 @@
 import { WEAPONS, CONSUMABLES, RARITIES, PLAYER } from './config.js';
 import { TERRAIN_SIZE, paintMinimap, POIS, poiAt } from './terrain.js';
 import { formatTime } from './util.js';
+import { iconSVG } from './icons.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -157,15 +158,15 @@ export class HUD {
     const sig = JSON.stringify([p.selected, c.buildMode, p.slots.map((s) => s && [s.type, s.rarity, s.count, s.mag])]);
     if (this.cache.hot !== sig) {
       this.cache.hot = sig;
-      let html = `<div class="slot pick ${p.selected === 0 && !c.buildMode ? 'sel' : ''}"><span class="num">1</span>PICK<br>AXE</div>`;
+      let html = `<div class="slot pick ${p.selected === 0 && !c.buildMode ? 'sel' : ''}"><span class="num">1</span>${iconSVG('pickaxe')}</div>`;
       p.slots.forEach((s, i) => {
         const sel = p.selected === i + 1 && !c.buildMode ? 'sel' : '';
         if (!s) { html += `<div class="slot ${sel}"><span class="num">${i + 2}</span></div>`; return; }
         if (s.kind === 'weapon') {
-          html += `<div class="slot r${s.rarity} ${sel}"><span class="num">${i + 2}</span>${WEAPONS[s.type].short}<span class="cnt">${s.mag}</span></div>`;
+          html += `<div class="slot r${s.rarity} ${sel}" title="${WEAPONS[s.type].name}"><span class="num">${i + 2}</span>${iconSVG(s.type)}<span class="cnt">${s.mag}</span></div>`;
         } else {
           const cs = CONSUMABLES[s.type];
-          html += `<div class="slot r${cs.rarity} ${sel}"><span class="num">${i + 2}</span>${cs.short}<span class="cnt">x${s.count}</span></div>`;
+          html += `<div class="slot r${cs.rarity} ${sel}" title="${cs.name}"><span class="num">${i + 2}</span>${iconSVG(s.type)}<span class="cnt">x${s.count}</span></div>`;
         }
       });
       this.hotbar.innerHTML = html;

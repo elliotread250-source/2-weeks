@@ -281,9 +281,10 @@ export class Game {
         const dx = pk.pos.x - f.pos.x, dz = pk.pos.z - f.pos.z, dy = pk.pos.y - f.pos.y;
         if (dx * dx + dz * dz > 1.7 * 1.7 || Math.abs(dy) > 1.8) continue;
         const k = pk.item.kind;
-        // Ammo and materials always auto-pick; weapons/heals only into empty slots.
+        // Ammo and materials auto-pick. Weapons and heals need E for the
+        // player; bots grab them when they have a free slot.
         if (k === 'ammo' || k === 'mat') this.pickupItem(f, pk);
-        else if (pk.age > 1.5 && f.slots.includes(null)) this.pickupItem(f, pk);
+        else if (!f.isPlayer && pk.age > 1.5 && f.slots.includes(null)) this.pickupItem(f, pk);
       }
     }
   }
@@ -453,7 +454,7 @@ export class Game {
     if (this.spectate && !this.spectate.alive) this.spectate = this.fighters.find((f) => f.alive && !f.isPlayer) || null;
 
     this.builds.update(dt);
-    this.loot.update(dt, this.time);
+    this.loot.update(dt, this.time, this.player.alive ? this.player.pos : this.camera.position);
     this.world.update(dt, this.time, this.focusHarvest);
     for (const f of this.fighters) if (f.alive && f.state !== 'bus') f.updateModel(dt, this.time);
     this.fx.update(dt);

@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { WEAPONS, CONSUMABLES, RARITIES, AMMO, LOOT_WEIGHTS } from './config.js';
 import { weightedIndex, rand, pick } from './util.js';
 import { glowTexture } from './textures.js';
+import { gunMesh } from './character.js';
+import { itemCardCanvas } from './icons.js';
 
 const WEAPON_WEIGHTS = { ar: 30, smg: 20, pump: 22, pistol: 16, sniper: 8, rocket: 4 };
 const CONSUMABLE_WEIGHTS = { bandage: 30, minis: 30, medkit: 14, bigpot: 18, chug: 4 };
@@ -50,12 +52,9 @@ export class LootSystem {
     this.col = collision;
     this.pickups = [];
     this.chests = [];
-    this.beamGeo = new THREE.CylinderGeometry(0.12, 0.35, 3, 8, 1, true);
-    this.beamGeo.translate(0, 1.5, 0);
-    this.ringGeo = new THREE.RingGeometry(0.35, 0.6, 20).rotateX(-Math.PI / 2);
-    this.beamMats = RARITIES.map((r) => new THREE.MeshBasicMaterial({
-      color: r.color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    }));
+    this.beamGeo = new THREE.CylinderGeometry(0.1, 0.42, 4.5, 12, 1, true);
+    this.beamGeo.translate(0, 2.25, 0);
+    this.glowGeo = new THREE.PlaneGeometry(1.8, 1.8).rotateX(-Math.PI / 2);
     this.sparkle = new THREE.SpriteMaterial({ map: glowTexture('#fff3a0'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
     this.lam = (c) => new THREE.MeshLambertMaterial({ color: c });
   }
@@ -133,52 +132,95 @@ export class LootSystem {
     }
   }
 
+  // Shared rarity materials for the ground effects.
+  rarityFx(r) {
+    if (!this.fxCache) this.fxCache = [];
+    if (this.fxCache[r]) return this.fxCache[r];
+    const col = RARITIES[r].color;
+    const c = document.createElement('canvas');
+    c.width = 4; c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 128, 0, 0);
+    grad.addColorStop(0, col + 'ff');
+    grad.addColorStop(0.35, col + '88');
+    grad.addColorStop(1, col + '00');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 4, 128);
+    const beamTex = new THREE.CanvasTexture(c);
+    const fx = {
+      beam: new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+      glow: new THREE.MeshBasicMaterial({ map: glowTexture(col), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+      spark: new THREE.SpriteMaterial({ map: glowTexture(col), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    };
+    this.fxCache[r] = fx;
+    return fx;
+  }
+
+  cardMaterial(item) {
+    if (!this.cardMats) this.cardMats = new Map();
+    const key = `${item.type}:${itemRarity(item)}`;
+    if (!this.cardMats.has(key)) {
+      const tex = new THREE.CanvasTexture(itemCardCanvas(item));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.cardMats.set(key, new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    }
+    return this.cardMats.get(key);
+  }
+
   makeMesh(item) {
     const g = new THREE.Group();
     const rarity = itemRarity(item);
+    const root = new THREE.Group();
+    let card = null, glow = null, sparks = [];
     if (item.kind === 'weapon') {
-      const len = { ar: 0.9, pump: 0.95, smg: 0.6, pistol: 0.4, sniper: 1.3, rocket: 1.2 }[item.type];
-      const thick = item.type === 'rocket' ? 0.24 : 0.14;
-      const body = new THREE.Mesh(new THREE.BoxGeometry(len, thick + 0.04, thick), this.lam('#2d3436'));
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(len * 0.6, 0.06, thick + 0.02), this.lam(RARITIES[rarity].color));
-      stripe.position.y = thick / 2 + 0.03;
-      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.1), this.lam('#2d3436'));
-      grip.position.set(len * 0.15, -0.15, 0);
-      g.add(body, stripe, grip);
+      // The real gun model, scaled up so it reads from a distance.
+      const gun = gunMesh(item.type, item.rarity);
+      gun.scale.setScalar(1.35);
+      gun.rotation.z = 0.25;
+      g.add(gun);
     } else if (item.kind === 'consumable') {
       const c = CONS_COLORS[item.type];
       const m = item.type === 'bandage'
-        ? new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.25, 10), this.lam(c))
+        ? new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3, 12), this.lam(c))
         : item.type === 'medkit'
-          ? new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.2), this.lam(c))
-          : new THREE.Mesh(new THREE.SphereGeometry(item.type === 'minis' ? 0.16 : 0.24, 10, 8), this.lam(c));
+          ? new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.42, 0.24), this.lam(c))
+          : new THREE.Mesh(new THREE.SphereGeometry(item.type === 'minis' ? 0.2 : 0.3, 12, 10), this.lam(c));
       g.add(m);
     } else if (item.kind === 'ammo') {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.24), this.lam(AMMO[item.type].color));
-      g.add(m);
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.24), this.lam(AMMO[item.type].color)));
     } else {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), this.lam(MAT_COLORS[item.type]));
-      g.add(m);
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), this.lam(MAT_COLORS[item.type])));
     }
-    const inner = g;
-    const root = new THREE.Group();
-    root.add(inner);
-    inner.position.y = 0.45;
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    root.add(g);
+    g.position.y = 0.55;
     if (item.kind === 'weapon' || item.kind === 'consumable') {
-      const beam = new THREE.Mesh(this.beamGeo, this.beamMats[rarity]);
-      const ring = new THREE.Mesh(this.ringGeo, this.beamMats[rarity]);
-      ring.position.y = 0.03;
-      root.add(beam, ring);
+      const fx = this.rarityFx(rarity);
+      const beam = new THREE.Mesh(this.beamGeo, fx.beam);
+      glow = new THREE.Mesh(this.glowGeo, fx.glow);
+      glow.position.y = 0.04;
+      root.add(beam, glow);
+      for (let i = 0; i < 3; i++) {
+        const sp = new THREE.Sprite(fx.spark);
+        sp.scale.setScalar(0.18);
+        root.add(sp);
+        sparks.push(sp);
+      }
+      card = new THREE.Sprite(this.cardMaterial(item));
+      card.scale.set(0.95, 0.6, 1);
+      card.position.y = 1.55;
+      card.visible = false;
+      root.add(card);
     }
-    return { root, inner };
+    return { root, inner: g, card, glow, sparks };
   }
 
   drop(item, pos, toss = true) {
-    const { root, inner } = this.makeMesh(item);
+    const { root, inner, card, glow, sparks } = this.makeMesh(item);
     root.position.copy(pos);
     this.scene.add(root);
     const vel = toss ? new THREE.Vector3(rand(-3, 3), rand(3, 5), rand(-3, 3)) : new THREE.Vector3();
-    const p = { item, pos: root.position, vel, mesh: root, inner, settled: !toss, age: 0, phase: Math.random() * 6 };
+    const p = { item, pos: root.position, vel, mesh: root, inner, card, glow, sparks, settled: !toss, age: 0, phase: Math.random() * 6 };
     if (!toss) {
       p.pos.y = this.col.groundHeight(p.pos.x, p.pos.z, p.pos.y + 0.6, 0.2);
     }
@@ -192,7 +234,7 @@ export class LootSystem {
     this.scene.remove(p.mesh);
   }
 
-  update(dt, time) {
+  update(dt, time, viewer) {
     for (const p of this.pickups) {
       p.age += dt;
       if (!p.settled) {
@@ -207,7 +249,23 @@ export class LootSystem {
         } else p.pos.y = ny;
       }
       p.inner.rotation.y = time * 1.5 + p.phase;
-      p.inner.position.y = 0.45 + Math.sin(time * 2 + p.phase) * 0.08;
+      p.inner.position.y = 0.55 + Math.sin(time * 2 + p.phase) * 0.1;
+      if (p.glow) {
+        const pulse = 1 + Math.sin(time * 3 + p.phase) * 0.15;
+        p.glow.scale.set(pulse, 1, pulse);
+        p.sparks.forEach((sp, i) => {
+          const a = time * 1.8 + p.phase + (i * Math.PI * 2) / 3;
+          const h = ((time * 0.6 + i / 3 + p.phase) % 1);
+          sp.position.set(Math.cos(a) * 0.45, 0.1 + h * 1.6, Math.sin(a) * 0.45);
+          sp.scale.setScalar(0.22 * (1 - h));
+        });
+      }
+      // Rarity card floats over loot when you're close enough to care.
+      if (p.card && viewer) {
+        const d = Math.hypot(p.pos.x - viewer.x, p.pos.y - viewer.y, p.pos.z - viewer.z);
+        p.card.visible = p.settled && d < 14;
+        p.card.position.y = 1.55 + Math.sin(time * 2 + p.phase) * 0.05;
+      }
     }
     for (const c of this.chests) {
       if (c.opened && c.openT < 1) {

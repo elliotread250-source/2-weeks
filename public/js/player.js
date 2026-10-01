@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { PLAYER, WEAPONS, KEYS, BUILD_COST, MAT_ORDER, PICKAXE } from './config.js';
 import { sfx } from './audio.js';
 import { itemName, itemRarity } from './loot.js';
+import { iconSVG } from './icons.js';
 import { RARITIES } from './config.js';
 
 const PIECE_KEYS = { KeyZ: 'wall', F1: 'wall', KeyX: 'floor', F2: 'floor', KeyC: 'ramp', F3: 'ramp', KeyV: 'cone', F4: 'cone' };
@@ -344,7 +345,7 @@ export class PlayerController {
       const rc = RARITIES[itemRarity(pickup.item)].color;
       const full = !p.hasRoomFor(pickup.item);
       const verb = full ? (p.selected > 0 ? 'Swap for' : 'Inventory full:') : 'Pick up';
-      g.hud.setPrompt(`<b>E</b>${verb} <span style="color:${rc}">${itemName(pickup.item)}</span>`);
+      g.hud.setPrompt(`<b>E</b>${verb} <span class="prompt-icon" style="background:${rc}">${iconSVG(pickup.item.type)}</span><span style="color:${rc}">${itemName(pickup.item)}</span>`);
       if (this.pressed.has(KEYS.interact)) {
         if (!full) g.pickupItem(p, pickup);
         else if (p.selected > 0) {

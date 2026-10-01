@@ -20,7 +20,7 @@ export const OUTFITS = [
 ];
 
 const gunCache = new Map();
-function gunMesh(type, rarity) {
+export function gunMesh(type, rarity) {
   const key = `${type}:${rarity}`;
   if (gunCache.has(key)) return gunCache.get(key).clone();
   const g = new THREE.Group();
