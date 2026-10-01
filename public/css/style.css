@@ -1,0 +1,180 @@
+:root {
+  --yellow: #ffe94a;
+  --blue: #2fb6ff;
+  --shield: #3fa6f2;
+  --health: #5cd65c;
+  --panel: rgba(10, 20, 45, 0.62);
+  --text: #ffffff;
+  --c0: #b4b4b4; --c1: #69bb2d; --c2: #3fa6f2; --c3: #b84fe8; --c4: #f39a32;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: #0b1a3a; color: var(--text);
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; user-select: none;
+}
+canvas { display: block; }
+.hidden { display: none !important; }
+button {
+  font-family: 'Luckiest Guy', 'Oswald', sans-serif; font-size: 34px; letter-spacing: 1px;
+  background: var(--yellow); color: #1d1d1d; border: none; padding: 14px 54px; cursor: pointer;
+  transform: skewX(-8deg); box-shadow: 0 6px 0 #b9a422; transition: transform .08s, filter .08s;
+}
+button:hover { filter: brightness(1.08); transform: skewX(-8deg) scale(1.04); }
+button:active { transform: skewX(-8deg) translateY(4px); box-shadow: 0 2px 0 #b9a422; }
+button.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none; font-size: 22px; }
+
+/* ---------------- lobby ---------------- */
+#lobby { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; overflow-y: auto; }
+.lobby-bg {
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, #4fb4ff 0%, #2a63d6 45%, #1b2f8a 100%);
+}
+.lobby-bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 40px, transparent 40px 80px);
+}
+.lobby-content { position: relative; text-align: center; padding: 24px 16px; max-width: 980px; width: 100%; }
+.logo {
+  font-family: 'Luckiest Guy', sans-serif; font-size: clamp(56px, 11vw, 120px); margin: 0; line-height: 1;
+  color: var(--yellow); text-shadow: 0 6px 0 #c2a514, 0 10px 30px rgba(0,0,0,.45); letter-spacing: 3px;
+  transform: skewX(-6deg);
+}
+.tag { font-size: 20px; margin: 10px 0 22px; opacity: .92; }
+.lobby-cols { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 26px; text-align: left; }
+.card { background: var(--panel); border: 2px solid rgba(255,255,255,.18); padding: 16px 20px; border-radius: 6px; flex: 1 1 340px; max-width: 460px; }
+.card h3 { margin: 0 0 8px; font-family: 'Luckiest Guy', sans-serif; font-weight: normal; font-size: 24px; color: var(--yellow); letter-spacing: 1px; }
+.card p { margin: 6px 0; font-size: 15px; line-height: 1.35; font-weight: 500; }
+.card table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.card td { padding: 2px 0; }
+.card td:first-child { color: var(--yellow); width: 92px; font-weight: 700; }
+.accent { color: var(--yellow); }
+.sens { margin-top: 18px; display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-size: 15px; }
+.sens input[type=range] { vertical-align: middle; width: 160px; }
+
+#loading {
+  position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center;
+  font-family: 'Luckiest Guy', sans-serif; font-size: 48px; color: var(--yellow); background: #1b2f8a;
+}
+#loading.show { display: flex; }
+
+#pause, #end {
+  position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(5, 10, 30, .55); gap: 16px;
+}
+#pause .card { text-align: center; display: flex; flex-direction: column; gap: 14px; flex: 0 0 auto; padding: 26px 40px; }
+#pause h2 { margin: 0; font-family: 'Luckiest Guy'; font-weight: normal; font-size: 40px; }
+.end-title { font-family: 'Luckiest Guy', sans-serif; font-size: clamp(48px, 9vw, 110px); color: var(--yellow); text-shadow: 0 6px 0 #a88c00; transform: skewX(-6deg); text-align: center; }
+.end-title.lose { color: #fff; text-shadow: 0 6px 0 #555; }
+.end-sub { font-size: 24px; text-align: center; }
+
+/* ---------------- HUD ---------------- */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#crosshair i { position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+#crosshair .t, #crosshair .b { width: 2px; height: 8px; left: -1px; }
+#crosshair .l, #crosshair .r { width: 8px; height: 2px; top: -1px; }
+#crosshair .dot { position: absolute; width: 4px; height: 4px; left: -2px; top: -2px; background: #fff; border-radius: 50%; box-shadow: 0 0 2px #000; }
+#crosshair.build i { display: none; }
+#crosshair.build .dot { width: 10px; height: 10px; left: -5px; top: -5px; background: transparent; border: 2px solid #fff; }
+#hitmarker { position: absolute; left: 50%; top: 50%; opacity: 0; }
+#hitmarker i { position: absolute; width: 10px; height: 2px; background: #fff; box-shadow: 0 0 2px #000; }
+#hitmarker i:nth-child(1) { transform: translate(-16px,-12px) rotate(45deg); }
+#hitmarker i:nth-child(2) { transform: translate(6px,-12px) rotate(-45deg); }
+#hitmarker i:nth-child(3) { transform: translate(-16px,10px) rotate(-45deg); }
+#hitmarker i:nth-child(4) { transform: translate(6px,10px) rotate(45deg); }
+#hitmarker.head i { background: var(--yellow); }
+
+#vignette { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(255,0,0,.55) 100%); transition: opacity .25s; }
+#storm-vignette { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, rgba(140,60,255,.15) 30%, rgba(110,30,200,.6) 100%); transition: opacity .5s; }
+#damage-dir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#damage-dir .arc { position: absolute; width: 70px; height: 14px; margin-left: -35px; margin-top: -150px; background: rgba(255,40,40,.85); border-radius: 50% 50% 0 0; transform-origin: 35px 150px; }
+
+#scope { position: absolute; inset: 0; display: none; }
+#scope.on { display: block; }
+#scope .lens { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0 34vh, #000 34.2vh); }
+#scope .lens::before, #scope .lens::after { content: ''; position: absolute; background: #000; }
+#scope .lens::before { left: 50%; top: 16vh; bottom: 16vh; width: 2px; }
+#scope .lens::after { top: 50%; left: calc(50% - 34vh); right: calc(50% - 34vh); height: 2px; }
+
+#numbers { position: absolute; inset: 0; overflow: hidden; }
+.dmg-num { position: absolute; left: 0; top: 0; font-family: 'Luckiest Guy', sans-serif; font-size: 28px; color: #fff; -webkit-text-stroke: 1.5px #000; text-shadow: 0 2px 0 #000; will-change: transform; }
+.dmg-num.shield { color: #7fd0ff; }
+.dmg-num.head { color: var(--yellow); font-size: 34px; }
+
+#topright { position: absolute; right: 16px; top: 16px; width: 180px; text-align: right; }
+#minimap { width: 180px; height: 180px; border: 3px solid rgba(255,255,255,.85); border-radius: 6px; background: #2fb6e8; }
+#stats { display: flex; gap: 14px; justify-content: flex-end; margin-top: 6px; font-size: 20px; font-weight: 700; text-shadow: 0 2px 2px #000; }
+#alive-count::before { content: '👤 '; }
+#kill-count::before { content: '🎯 '; }
+#storm-info { margin-top: 4px; font-size: 16px; font-weight: 700; text-shadow: 0 2px 2px #000; color: #e2c4ff; }
+#poi-name { margin-top: 4px; font-size: 15px; text-shadow: 0 2px 2px #000; color: var(--yellow); }
+
+#killfeed { position: absolute; left: 16px; top: 16px; display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+#killfeed div { background: rgba(0,0,0,.45); padding: 3px 10px; border-left: 3px solid var(--yellow); animation: fadeout 6s forwards; }
+#killfeed .me { border-color: var(--blue); }
+@keyframes fadeout { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
+#center-msg { position: absolute; top: 22%; width: 100%; text-align: center; font-family: 'Luckiest Guy', sans-serif; font-size: 42px; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,.5); opacity: 0; transition: opacity .3s; letter-spacing: 1px; }
+#center-msg.show { opacity: 1; }
+#sub-msg { position: absolute; top: calc(22% + 54px); width: 100%; text-align: center; font-size: 20px; font-weight: 700; text-shadow: 0 2px 2px #000; }
+#prompt { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); background: rgba(0,0,0,.5); padding: 6px 14px; font-size: 17px; border-radius: 4px; display: none; white-space: nowrap; }
+#prompt b { background: #fff; color: #000; padding: 0 7px; border-radius: 3px; margin-right: 8px; }
+#prompt.show { display: block; }
+#progress { position: absolute; left: 50%; top: 64%; width: 220px; height: 10px; margin-left: -110px; background: rgba(0,0,0,.5); display: none; border: 1px solid rgba(255,255,255,.5); }
+#progress.show { display: block; }
+#progress .fill { height: 100%; width: 0; background: var(--yellow); }
+#progress span { position: absolute; top: 12px; width: 100%; text-align: center; font-size: 14px; text-shadow: 0 1px 2px #000; }
+
+#bars { position: absolute; left: 22px; bottom: 22px; width: min(360px, 40vw); display: flex; flex-direction: column; gap: 5px; }
+.bar { position: relative; height: 20px; background: rgba(0,0,0,.5); transform: skewX(-12deg); border: 2px solid rgba(255,255,255,.25); }
+.bar .fill { height: 100%; transition: width .15s; }
+.bar.shield .fill { background: linear-gradient(#7fd0ff, var(--shield)); }
+.bar.health .fill { background: linear-gradient(#9cf29c, var(--health)); }
+.bar span { position: absolute; left: 8px; top: -2px; font-weight: 700; font-size: 16px; transform: skewX(12deg); text-shadow: 0 1px 2px #000; }
+
+#ammo-readout { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); font-size: 28px; font-weight: 700; text-shadow: 0 2px 3px #000; }
+#ammo-readout small { font-size: 18px; opacity: .8; }
+
+#hotbar { position: absolute; right: 18px; bottom: 18px; display: flex; gap: 5px; }
+.slot { width: 64px; height: 64px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.3); position: relative; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; text-align: center; line-height: 1.05; text-shadow: 0 1px 2px #000; }
+.slot .num { position: absolute; left: 3px; top: 1px; font-size: 11px; opacity: .8; }
+.slot .cnt { position: absolute; right: 3px; bottom: 1px; font-size: 12px; }
+.slot.sel { border-color: #fff; transform: translateY(-8px); box-shadow: 0 0 0 2px #fff; }
+.slot.r0 { background: linear-gradient(160deg, #c8c8c8, #6d6d6d); }
+.slot.r1 { background: linear-gradient(160deg, #7fd13b, #2f6d12); }
+.slot.r2 { background: linear-gradient(160deg, #5ec2ff, #1a5c9c); }
+.slot.r3 { background: linear-gradient(160deg, #d27bff, #622089); }
+.slot.r4 { background: linear-gradient(160deg, #ffbe5c, #9a4b0c); }
+.slot.pick { background: linear-gradient(160deg, #5aa9e6, #29507a); }
+
+#mats { position: absolute; right: 18px; bottom: 100px; display: flex; gap: 6px; }
+.mat { background: rgba(0,0,0,.45); padding: 3px 8px; display: flex; align-items: center; gap: 6px; font-size: 18px; border: 2px solid transparent; }
+.mat .ico { width: 18px; height: 18px; display: inline-block; border-radius: 3px; }
+.mat[data-mat=wood] .ico { background: #b5763d; }
+.mat[data-mat=brick] .ico { background: #c0563b; }
+.mat[data-mat=metal] .ico { background: #9aa5b1; }
+.mat.sel { border-color: var(--yellow); }
+#mat-gain { position: absolute; right: 24px; bottom: 136px; font-size: 20px; font-weight: 700; text-shadow: 0 2px 2px #000; color: var(--yellow); opacity: 0; transition: opacity .3s; }
+#mat-gain.show { opacity: 1; transition: none; }
+
+#build-bar { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); display: none; gap: 8px; }
+#hud.building #build-bar { display: flex; }
+.piece { width: 56px; height: 56px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.3); position: relative; display: flex; align-items: center; justify-content: center; }
+.piece b { position: absolute; left: 3px; top: 0; font-size: 12px; }
+.piece.sel { border-color: var(--blue); background: rgba(47,182,255,.35); }
+.ico.wall { width: 26px; height: 30px; border: 3px solid #fff; }
+.ico.floor { width: 32px; height: 14px; border: 3px solid #fff; transform: perspective(40px) rotateX(45deg); }
+.ico.ramp { width: 34px; height: 4px; background: #fff; transform: rotate(-35deg); }
+.ico.cone { width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-bottom: 20px solid #fff; }
+#mode-tag { position: absolute; left: 50%; bottom: 132px; transform: translateX(-50%); font-family: 'Luckiest Guy', sans-serif; font-size: 18px; color: var(--blue); text-shadow: 0 2px 0 #000; letter-spacing: 1px; }
+
+#bigmap { position: fixed; inset: 0; z-index: 20; background: rgba(5,10,30,.7); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+#bigmap-canvas { width: min(84vh, 92vw); height: min(84vh, 92vw); border: 4px solid #fff; border-radius: 6px; }
+#bigmap .hint { margin-top: 8px; font-size: 16px; }
+
+@media (max-width: 700px) {
+  .slot { width: 46px; height: 46px; font-size: 10px; }
+  #topright, #minimap { width: 120px; }
+  #minimap { height: 120px; }
+  #mats { bottom: 76px; }
+}

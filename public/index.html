@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Two Weeks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Oswald:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><b class="dot"></b></div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="damage-dir"></div>
+    <div id="vignette"></div>
+    <div id="storm-vignette"></div>
+    <div id="scope"><div class="lens"></div></div>
+    <div id="numbers"></div>
+
+    <div id="topright">
+      <canvas id="minimap" width="180" height="180"></canvas>
+      <div id="stats">
+        <span id="alive-count" title="Players left">25</span>
+        <span id="kill-count" title="Eliminations">0</span>
+      </div>
+      <div id="storm-info"></div>
+      <div id="poi-name"></div>
+    </div>
+
+    <div id="killfeed"></div>
+    <div id="center-msg"></div>
+    <div id="sub-msg"></div>
+    <div id="prompt"></div>
+    <div id="progress"><div class="fill"></div><span></span></div>
+
+    <div id="bars">
+      <div class="bar shield"><div class="fill"></div><span>100</span></div>
+      <div class="bar health"><div class="fill"></div><span>100</span></div>
+    </div>
+
+    <div id="ammo-readout"></div>
+
+    <div id="build-bar">
+      <div class="piece" data-piece="wall"><b>Z</b><span class="ico wall"></span></div>
+      <div class="piece" data-piece="floor"><b>X</b><span class="ico floor"></span></div>
+      <div class="piece" data-piece="ramp"><b>C</b><span class="ico ramp"></span></div>
+      <div class="piece" data-piece="cone"><b>V</b><span class="ico cone"></span></div>
+    </div>
+
+    <div id="mats">
+      <div class="mat" data-mat="wood"><span class="ico"></span><b>0</b></div>
+      <div class="mat" data-mat="brick"><span class="ico"></span><b>0</b></div>
+      <div class="mat" data-mat="metal"><span class="ico"></span><b>0</b></div>
+    </div>
+    <div id="mat-gain"></div>
+    <div id="hotbar"></div>
+    <div id="mode-tag"></div>
+  </div>
+
+  <div id="bigmap" class="hidden">
+    <canvas id="bigmap-canvas" width="720" height="720"></canvas>
+    <div class="hint">M to close</div>
+  </div>
+
+  <!-- Lobby -->
+  <div id="lobby">
+    <div class="lobby-bg"></div>
+    <div class="lobby-content">
+      <h1 class="logo">TWO WEEKS</h1>
+      <p class="tag">Build. Edit. Drop on Rebirth Island. Be the last one standing.</p>
+      <div class="lobby-cols">
+        <div class="card controls">
+          <h3>Controls</h3>
+          <table>
+            <tr><td>WASD</td><td>Move</td></tr>
+            <tr><td>Shift</td><td>Sprint</td></tr>
+            <tr><td>Space</td><td>Jump / leave bus / open glider</td></tr>
+            <tr><td>Mouse</td><td>Look, LMB fire / place, RMB aim</td></tr>
+            <tr><td>1</td><td>Pickaxe</td></tr>
+            <tr><td>2 - 6</td><td>Inventory slots (or mouse wheel)</td></tr>
+            <tr><td>Q</td><td>Toggle build mode</td></tr>
+            <tr><td>Z X C V</td><td>Wall, floor, ramp, cone</td></tr>
+            <tr><td>RMB / T</td><td>Swap build material (build mode)</td></tr>
+            <tr><td>G</td><td>Edit build, G again to confirm, RMB reset</td></tr>
+            <tr><td>E</td><td>Pick up / hold to open chests</td></tr>
+            <tr><td>R</td><td>Reload</td></tr>
+            <tr><td>M</td><td>Map</td></tr>
+          </table>
+        </div>
+        <div class="card rules">
+          <h3>The drop</h3>
+          <p>Jump off the Battle Bus, skydive, and your glider pops automatically near the ground.</p>
+          <p>You land with a pickaxe, 100 health and 100 shield. Farm wood from trees, brick from rocks and metal from cars and containers. Hit the blue weak point for double materials.</p>
+          <p>Loot runs Common, Uncommon, Rare, Epic, Legendary. Chests glow gold.</p>
+          <p><b class="accent">Resurgence:</b> like Rebirth Island, you redeploy after dying until the third storm circle starts. After that, it's for keeps.</p>
+        </div>
+      </div>
+      <button id="play-btn">PLAY</button>
+      <div class="sens">
+        <label>Mouse sensitivity <input id="sens" type="range" min="0.4" max="2.5" step="0.05" value="1" /></label>
+        <label><input id="graphics" type="checkbox" checked /> Shadows</label>
+      </div>
+    </div>
+  </div>
+
+  <div id="pause" class="hidden">
+    <div class="card">
+      <h2>Paused</h2>
+      <button id="resume-btn">RESUME</button>
+      <button id="quit-btn" class="ghost">RETURN TO LOBBY</button>
+    </div>
+  </div>
+
+  <div id="end" class="hidden">
+    <div class="end-title"></div>
+    <div class="end-sub"></div>
+    <button id="again-btn">PLAY AGAIN</button>
+  </div>
+
+  <div id="loading">Dropping in...</div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
