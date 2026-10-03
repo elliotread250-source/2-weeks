@@ -4,7 +4,7 @@
     "name": "Unbreakable Leads",
     "description": "Leads never snap, no matter how fast or far you go. Works with boats and on Realms.",
     "uuid": "4f6b2a1e-8c3d-4e7a-9b15-2d6f0a9c7e31",
-    "version": [1, 1, 0],
+    "version": [1, 2, 0],
     "min_engine_version": [1, 21, 90]
   },
   "modules": [
@@ -12,7 +12,7 @@
       "type": "script",
       "language": "javascript",
       "uuid": "a83c5d27-1f94-4b60-8e2a-7c19d4b5f062",
-      "version": [1, 1, 0],
+      "version": [1, 2, 0],
       "entry": "scripts/main.js"
     }
   ],

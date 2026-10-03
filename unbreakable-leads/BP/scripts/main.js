@@ -9,10 +9,14 @@ import { system, world } from "@minecraft/server";
 // lead, hold a lead, or carry the player or mob that's on one.
 const PULL_DISTANCE = 6;
 const RESCAN_TICKS = 20;
+// How long after a player clicks a mob (or a fence) we treat a lead coming off as on purpose.
+const TOUCH_WINDOW = 20;
+// How long we wait after a lead comes off before deciding it snapped.
+const SNAP_GRACE = 2;
 const DIMENSIONS = ["minecraft:overworld", "minecraft:nether", "minecraft:the_end"];
 
 // entity id -> what it was tied to last tick
-/** @type {Map<string, { entity: import("@minecraft/server").Entity, holder: import("@minecraft/server").Entity | undefined, location: import("@minecraft/server").Vector3, dimension: import("@minecraft/server").Dimension }>} */
+/** @type {Map<string, { entity: import("@minecraft/server").Entity, holder: import("@minecraft/server").Entity | undefined, location: import("@minecraft/server").Vector3, dimension: import("@minecraft/server").Dimension, pending?: boolean }>} */
 const tracked = new Map();
 /** entity ids a player deliberately interacted with recently (unleash, shears, fence, etc.) */
 const touched = new Map();
@@ -44,6 +48,20 @@ function rootVehicle(entity) {
     current = below;
   }
   return current;
+}
+
+/** @param {import("@minecraft/server").Entity | undefined} entity */
+function isSneaking(entity) {
+  try {
+    return entity.typeId === "minecraft:player" && entity.isSneaking;
+  } catch {
+    return false;
+  }
+}
+
+/** @param {string} id */
+function markTouched(id) {
+  touched.set(id, system.currentTick);
 }
 
 /** @param {import("@minecraft/server").Entity} entity */
@@ -181,11 +199,12 @@ function removeDroppedLead(dimension, location) {
 
 function tick() {
   const now = system.currentTick;
-  for (const [id, t] of touched) if (now - t > 5) touched.delete(id);
-  for (const [id, f] of freshLeads) if (now - f.tick > 5) freshLeads.delete(id);
+  for (const [id, t] of touched) if (now - t > TOUCH_WINDOW) touched.delete(id);
+  for (const [id, f] of freshLeads) if (now - f.tick > 10) freshLeads.delete(id);
 
   for (const [id, state] of tracked) {
     const { entity } = state;
+    if (state.pending) continue;
     if (!entity.isValid) {
       tracked.delete(id);
       continue;
@@ -217,34 +236,46 @@ function tick() {
     // It was on a lead last tick and isn't now. Work out if the lead snapped
     // or if someone took it off on purpose.
     const holder = state.holder;
-    const deliberate =
+    const onPurpose = () =>
       touched.has(id) ||
       !holder?.isValid ||
       isDead(holder) ||
+      isSneaking(holder) ||
       holder.typeId === "minecraft:leash_knot" ||
-      touched.has(holder.id);
+      touched.has(holder.id) ||
+      !!leashOf(entity)?.isLeashed;
 
-    if (deliberate) {
+    if (onPurpose()) {
       tracked.delete(id);
       continue;
     }
 
-    pullTo(entity, holder);
+    // Give the game a couple of ticks to tell us a player clicked the mob
+    // before we decide the lead snapped. Those events can land a tick late.
+    state.pending = true;
     const snappedAt = state.location;
     const snappedIn = state.dimension;
-    system.run(() => {
-      if (!entity.isValid || !holder.isValid) return;
-      try {
-        leashOf(entity)?.leashTo(holder);
-      } catch {
+    system.runTimeout(() => {
+      state.pending = false;
+      if (!entity.isValid || onPurpose()) {
         tracked.delete(id);
         return;
       }
-      // Eat the lead item the snap dropped so nobody gets a free one.
-      if (!removeDroppedLead(snappedIn, snappedAt)) {
-        system.runTimeout(() => removeDroppedLead(snappedIn, snappedAt), 2);
-      }
-    });
+      pullTo(entity, holder);
+      system.run(() => {
+        if (!entity.isValid || !holder.isValid) return;
+        try {
+          leashOf(entity)?.leashTo(holder);
+        } catch {
+          tracked.delete(id);
+          return;
+        }
+        // Eat the lead item the snap dropped so nobody gets a free one.
+        if (!removeDroppedLead(snappedIn, snappedAt)) {
+          system.runTimeout(() => removeDroppedLead(snappedIn, snappedAt), 2);
+        }
+      });
+    }, SNAP_GRACE);
   }
 }
 
@@ -257,10 +288,17 @@ world.afterEvents.entitySpawn.subscribe(({ entity }) => {
   } catch {}
 });
 
+// Before-events fire the instant a player clicks, ahead of the lead coming off,
+// so a deliberate unleash (empty hand, shears, handing mobs to a boat) is
+// always recorded in time. The after-events are a backup.
+world.beforeEvents.playerInteractWithEntity.subscribe(({ player, target }) => {
+  markTouched(target.id);
+  markTouched(player.id);
+});
+
 world.afterEvents.playerInteractWithEntity.subscribe(({ player, target }) => {
-  // Covers handing your mobs over to a boat, as well as unleashing or shearing.
-  touched.set(target.id, system.currentTick);
-  touched.set(player.id, system.currentTick);
+  markTouched(target.id);
+  markTouched(player.id);
   // Someone may have just put a lead on (or tied something to their boat), start watching right away.
   system.run(() => {
     if (!target.isValid) return;
@@ -270,8 +308,11 @@ world.afterEvents.playerInteractWithEntity.subscribe(({ player, target }) => {
 });
 
 // Clicking a fence or wall ties your mobs to it. That swaps the holder, it isn't a snap.
+world.beforeEvents.playerInteractWithBlock.subscribe(({ player, block }) => {
+  if (/fence|wall/.test(block.typeId)) markTouched(player.id);
+});
 world.afterEvents.playerInteractWithBlock.subscribe(({ player, block }) => {
-  if (/fence|wall/.test(block.typeId)) touched.set(player.id, system.currentTick);
+  if (/fence|wall/.test(block.typeId)) markTouched(player.id);
 });
 
 system.runInterval(tick, 1);
