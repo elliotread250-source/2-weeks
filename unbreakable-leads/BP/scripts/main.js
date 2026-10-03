@@ -3,6 +3,10 @@ import { system, world } from "@minecraft/server";
 // Vanilla snaps a lead once the mob is ~10 blocks from whatever holds it.
 // We pull the mob back well before that, and if the game still snaps it
 // (ender pearl, /tp, a portal), we tie it straight back on.
+//
+// Everything runs on the server, so it covers every player on a Realm or
+// multiplayer world at once. Boats work at both ends: a boat can be on a
+// lead, hold a lead, or carry the player or mob that's on one.
 const PULL_DISTANCE = 6;
 const RESCAN_TICKS = 20;
 const DIMENSIONS = ["minecraft:overworld", "minecraft:nether", "minecraft:the_end"];
@@ -10,8 +14,11 @@ const DIMENSIONS = ["minecraft:overworld", "minecraft:nether", "minecraft:the_en
 // entity id -> what it was tied to last tick
 /** @type {Map<string, { entity: import("@minecraft/server").Entity, holder: import("@minecraft/server").Entity | undefined, location: import("@minecraft/server").Vector3, dimension: import("@minecraft/server").Dimension }>} */
 const tracked = new Map();
-/** entity ids a player deliberately interacted with recently (unleash, shears, etc.) */
+/** entity ids a player deliberately interacted with recently (unleash, shears, fence, etc.) */
 const touched = new Map();
+/** lead items that just dropped, so we only ever delete the one a snap made */
+/** @type {Map<string, { item: import("@minecraft/server").Entity, tick: number }>} */
+const freshLeads = new Map();
 
 /** @param {import("@minecraft/server").Entity} entity @returns {import("@minecraft/server").EntityLeashableComponent | undefined} */
 function leashOf(entity) {
@@ -19,6 +26,33 @@ function leashOf(entity) {
     return entity.getComponent("minecraft:leashable");
   } catch {
     return undefined;
+  }
+}
+
+/** The boat (or other vehicle) at the bottom of whatever this entity is sitting in. */
+/** @param {import("@minecraft/server").Entity} entity */
+function rootVehicle(entity) {
+  let current = entity;
+  for (let i = 0; i < 8; i++) {
+    let below;
+    try {
+      below = current.getComponent("minecraft:riding")?.entityRidingOn;
+    } catch {
+      break;
+    }
+    if (!below?.isValid) break;
+    current = below;
+  }
+  return current;
+}
+
+/** @param {import("@minecraft/server").Entity} entity */
+function isDead(entity) {
+  try {
+    const health = entity.getComponent("minecraft:health");
+    return health ? health.currentValue <= 0 : false;
+  } catch {
+    return false;
   }
 }
 
@@ -50,55 +84,105 @@ function rescan() {
 
 /** @param {import("@minecraft/server").Entity} holder */
 function landingSpot(holder) {
-  const at = holder.location;
+  // If the holder is in a boat, steer by the boat, since the player's own velocity reads as zero.
+  const anchor = rootVehicle(holder);
+  const at = anchor.location;
   let v = { x: 0, y: 0, z: 0 };
   try {
-    v = holder.getVelocity();
+    v = anchor.getVelocity();
   } catch {}
   const speed = Math.hypot(v.x, v.z);
   if (speed < 0.05) return at;
   // Drop the mob just behind the holder so it isn't spawned in their face.
-  const spot = { x: at.x - (v.x / speed) * 1.5, y: at.y, z: at.z - (v.z / speed) * 1.5 };
+  const spot = { x: at.x - (v.x / speed) * 2, y: at.y, z: at.z - (v.z / speed) * 2 };
   try {
-    const block = holder.dimension.getBlock(spot);
-    if (block && !block.isAir) return at;
+    const block = anchor.dimension.getBlock(spot);
+    if (block && !block.isAir && !block.isLiquid) return at;
   } catch {
     return at;
   }
   return spot;
 }
 
+/** Everyone sitting in this vehicle, and anyone sitting on them. */
+/** @param {import("@minecraft/server").Entity} vehicle */
+function ridersOf(vehicle) {
+  /** @type {{ rider: import("@minecraft/server").Entity, seat: import("@minecraft/server").Entity }[]} */
+  const out = [];
+  try {
+    for (const rider of vehicle.getComponent("minecraft:rideable")?.getRiders() ?? []) {
+      out.push({ rider, seat: vehicle });
+      out.push(...ridersOf(rider));
+    }
+  } catch {}
+  return out;
+}
+
 /** @param {import("@minecraft/server").Entity} entity @param {import("@minecraft/server").Entity} holder */
 function pullTo(entity, holder) {
+  // A mob sitting in a boat gets pulled boat and all, same as vanilla does.
+  const mover = rootVehicle(entity);
+  if (mover.id === rootVehicle(holder).id) return;
+
+  const spot = landingSpot(holder);
+  const riders = ridersOf(mover);
   try {
-    entity.teleport(landingSpot(holder), { dimension: holder.dimension, keepVelocity: false, checkForBlocks: false });
-    entity.addEffect("slow_falling", 40, { showParticles: false });
-  } catch {}
+    mover.teleport(spot, { dimension: holder.dimension, keepVelocity: false, checkForBlocks: false });
+    if (mover.typeId !== "minecraft:boat" && mover.typeId !== "minecraft:chest_boat") {
+      mover.addEffect("slow_falling", 40, { showParticles: false });
+    }
+  } catch {
+    return;
+  }
+  if (riders.length === 0) return;
+
+  // Teleporting a boat can throw its passengers out. Put them back in.
+  system.run(() => {
+    for (const { rider, seat } of riders) {
+      if (!rider.isValid || !seat.isValid) continue;
+      let ridingOn;
+      try {
+        ridingOn = rider.getComponent("minecraft:riding")?.entityRidingOn;
+      } catch {}
+      if (ridingOn?.id === seat.id) continue;
+      try {
+        rider.teleport(seat.location, { dimension: seat.dimension, keepVelocity: false, checkForBlocks: false });
+        seat.getComponent("minecraft:rideable")?.addRider(rider);
+      } catch {}
+    }
+  });
 }
 
 /** @param {import("@minecraft/server").Dimension} dimension @param {import("@minecraft/server").Vector3} location */
 function removeDroppedLead(dimension, location) {
-  try {
-    const items = dimension.getEntities({ type: "minecraft:item", location, maxDistance: 4 });
-    for (const item of items) {
-      const stack = item.getComponent("minecraft:item")?.itemStack;
-      if (stack?.typeId === "minecraft:lead") {
-        const where = item.location;
-        item.remove();
-        if (stack.amount > 1) {
-          stack.amount -= 1;
-          dimension.spawnItem(stack, where);
-        }
-        return true;
-      }
+  for (const [id, { item }] of freshLeads) {
+    if (!item.isValid) {
+      freshLeads.delete(id);
+      continue;
     }
-  } catch {}
+    if (item.dimension.id !== dimension.id) continue;
+    const a = item.location;
+    if (Math.hypot(a.x - location.x, a.y - location.y, a.z - location.z) > 4) continue;
+    try {
+      const stack = item.getComponent("minecraft:item")?.itemStack;
+      if (stack?.typeId !== "minecraft:lead") continue;
+      const where = item.location;
+      item.remove();
+      freshLeads.delete(id);
+      if (stack.amount > 1) {
+        stack.amount -= 1;
+        dimension.spawnItem(stack, where);
+      }
+      return true;
+    } catch {}
+  }
   return false;
 }
 
 function tick() {
   const now = system.currentTick;
   for (const [id, t] of touched) if (now - t > 5) touched.delete(id);
+  for (const [id, f] of freshLeads) if (now - f.tick > 5) freshLeads.delete(id);
 
   for (const [id, state] of tracked) {
     const { entity } = state;
@@ -114,7 +198,7 @@ function tick() {
 
     if (leash.isLeashed) {
       const holder = leash.leashHolder;
-      if (!holder?.isValid) continue;
+      if (!holder?.isValid || isDead(holder)) continue;
       state.holder = holder;
       state.location = entity.location;
       state.dimension = entity.dimension;
@@ -136,8 +220,9 @@ function tick() {
     const deliberate =
       touched.has(id) ||
       !holder?.isValid ||
+      isDead(holder) ||
       holder.typeId === "minecraft:leash_knot" ||
-      (holder.typeId === "minecraft:player" && touched.has(holder.id));
+      touched.has(holder.id);
 
     if (deliberate) {
       tracked.delete(id);
@@ -155,7 +240,7 @@ function tick() {
         tracked.delete(id);
         return;
       }
-      // Eat the lead item the snap dropped so you don't get a free one.
+      // Eat the lead item the snap dropped so nobody gets a free one.
       if (!removeDroppedLead(snappedIn, snappedAt)) {
         system.runTimeout(() => removeDroppedLead(snappedIn, snappedAt), 2);
       }
@@ -163,9 +248,20 @@ function tick() {
   }
 }
 
-world.afterEvents.playerInteractWithEntity.subscribe(({ target }) => {
+world.afterEvents.entitySpawn.subscribe(({ entity }) => {
+  if (entity.typeId !== "minecraft:item") return;
+  try {
+    if (entity.getComponent("minecraft:item")?.itemStack.typeId === "minecraft:lead") {
+      freshLeads.set(entity.id, { item: entity, tick: system.currentTick });
+    }
+  } catch {}
+});
+
+world.afterEvents.playerInteractWithEntity.subscribe(({ player, target }) => {
+  // Covers handing your mobs over to a boat, as well as unleashing or shearing.
   touched.set(target.id, system.currentTick);
-  // The player may have just put a lead on, start watching it right away.
+  touched.set(player.id, system.currentTick);
+  // Someone may have just put a lead on (or tied something to their boat), start watching right away.
   system.run(() => {
     if (!target.isValid) return;
     const leash = leashOf(target);
