@@ -1,0 +1,25 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Firework Command",
+    "description": "Type /firework <amount> to get that many flight duration firework rockets. No cheats needed.",
+    "uuid": "e64e43bd-8c5c-47ab-902d-562574e194c6",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 21, 90]
+  },
+  "modules": [
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "bb18cb64-095f-418f-895e-f5a4d39bb031",
+      "entry": "scripts/main.js",
+      "version": [1, 0, 0]
+    }
+  ],
+  "dependencies": [
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.0.0"
+    }
+  ]
+}
