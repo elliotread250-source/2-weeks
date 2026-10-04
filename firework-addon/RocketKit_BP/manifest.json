@@ -2,9 +2,9 @@
   "format_version": 2,
   "header": {
     "name": "Rocket Kit",
-    "description": "Type /firework <amount> to get that many flight duration firework rockets. No cheats needed.",
+    "description": "Type /sk <amount> to get that many flight duration firework rockets. No cheats needed.",
     "uuid": "50411295-db78-44b6-a8ac-34fae670a725",
-    "version": [2, 0, 0],
+    "version": [2, 1, 0],
     "min_engine_version": [1, 21, 90]
   },
   "modules": [
@@ -13,7 +13,7 @@
       "language": "javascript",
       "uuid": "4729d6f4-c695-4fe8-b0e0-8270e02e94fe",
       "entry": "scripts/main.js",
-      "version": [2, 0, 0]
+      "version": [2, 1, 0]
     }
   ],
   "dependencies": [

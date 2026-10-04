@@ -36,11 +36,11 @@ function giveRockets(player, amount) {
 }
 
 system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
-  // The game also registers the un-namespaced form, so players can just type /firework.
+  // The game also registers the un-namespaced form, so players can just type /sk.
   // GameDirectors means operators only. Players without op can't run it, and it doesn't show up when they type "/".
   customCommandRegistry.registerCommand(
     {
-      name: "rocketkit:firework",
+      name: "rocketkit:sk",
       description: "Give yourself firework rockets for elytra flight",
       permissionLevel: CommandPermissionLevel.GameDirectors,
       cheatsRequired: false,
@@ -49,7 +49,7 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
     (origin, amount) => {
       const player = origin.sourceEntity;
       if (!(player instanceof Player)) {
-        return { status: CustomCommandStatus.Failure, message: "Only players can use /firework." };
+        return { status: CustomCommandStatus.Failure, message: "Only players can use /sk." };
       }
       if (amount < 1 || amount > MAX_AMOUNT) {
         return { status: CustomCommandStatus.Failure, message: `Pick a number from 1 to ${MAX_AMOUNT}.` };

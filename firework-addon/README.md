@@ -1,8 +1,8 @@
 # Rocket Kit (Bedrock add-on)
 
-Type `/firework 64` and you get 64 firework rockets for elytra flight. Any number from 1 to 6400 works. Stacks go into your inventory and whatever doesn't fit drops at your feet.
+Type `/sk 64` and you get 64 firework rockets for elytra flight. Any number from 1 to 6400 works. Stacks go into your inventory and whatever doesn't fit drops at your feet.
 
-Only operators can use it. Players without op don't see `/firework` when they type `/` in chat, and they can't run it. The world host is an operator by default. To give someone access, open the pause menu, pick the player and set them to Operator. Bedrock has no way to hide a command from the people who are allowed to run it, so you'll still see it in your own list.
+Only operators can use it. Players without op don't see `/sk` when they type `/` in chat, and they can't run it. The world host is an operator by default. To give someone access, open the pause menu, pick the player and set them to Operator. Bedrock has no way to hide a command from the people who are allowed to run it, so you'll still see it in your own list.
 
 ## Install
 
