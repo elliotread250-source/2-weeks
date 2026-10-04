@@ -1,9 +1,9 @@
 {
   "format_version": 2,
   "header": {
-    "name": "Sky Kit",
-    "description": "/sk <amount> gives flight duration 3 firework rockets, /er <amount> gives XP bottles. No cheats needed.",
-    "uuid": "6c4078d6-909e-4873-903b-6705c94158f2",
+    "name": "Sky Kit Pro",
+    "description": "Operator commands: /sk rockets (flight 3), /er XP bottles, /ep ender pearls, /bm adds Unbreaking III and Mending to your held item. No cheats needed.",
+    "uuid": "9c134441-78fb-4504-a62d-f7891a19e58e",
     "version": [1, 0, 0],
     "min_engine_version": [1, 21, 90]
   },
@@ -11,7 +11,7 @@
     {
       "type": "script",
       "language": "javascript",
-      "uuid": "9de19c7a-06a5-4991-96b2-ba4d46228e44",
+      "uuid": "22e968ff-1084-4170-9913-dddc80028bfb",
       "entry": "scripts/main.js",
       "version": [1, 0, 0]
     }
