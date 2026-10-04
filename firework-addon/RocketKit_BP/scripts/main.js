@@ -30,8 +30,8 @@ function giveRockets(player, amount) {
   }
 
   const label = amount === 1 ? "firework rocket" : "firework rockets";
-  let message = `§aGave you ${amount} ${label}.`;
-  if (dropped > 0) message += ` §e${dropped} didn't fit and were dropped at your feet.`;
+  let message = `§aGave you ${amount} ${label}`;
+  if (dropped > 0) message += `\n§e${dropped} didn't fit and were dropped at your feet`;
   player.sendMessage(message);
 }
 
@@ -49,10 +49,10 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
     (origin, amount) => {
       const player = origin.sourceEntity;
       if (!(player instanceof Player)) {
-        return { status: CustomCommandStatus.Failure, message: "Only players can use /sk." };
+        return { status: CustomCommandStatus.Failure, message: "Only players can use /sk" };
       }
       if (amount < 1 || amount > MAX_AMOUNT) {
-        return { status: CustomCommandStatus.Failure, message: `Pick a number from 1 to ${MAX_AMOUNT}.` };
+        return { status: CustomCommandStatus.Failure, message: `Pick a number from 1 to ${MAX_AMOUNT}` };
       }
 
       // Command callbacks run in read-only mode, so the inventory change waits for the next tick.
