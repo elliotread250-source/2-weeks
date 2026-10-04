@@ -37,11 +37,12 @@ function giveRockets(player, amount) {
 
 system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
   // The game also registers the un-namespaced form, so players can just type /firework.
+  // GameDirectors means operators only. Players without op can't run it, and it doesn't show up when they type "/".
   customCommandRegistry.registerCommand(
     {
       name: "fireworkcmd:firework",
       description: "Give yourself firework rockets for elytra flight",
-      permissionLevel: CommandPermissionLevel.Any,
+      permissionLevel: CommandPermissionLevel.GameDirectors,
       cheatsRequired: false,
       mandatoryParameters: [{ type: CustomCommandParamType.Integer, name: "amount" }],
     },
