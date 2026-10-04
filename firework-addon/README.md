@@ -1,14 +1,18 @@
-# Rocket Kit (Bedrock add-on)
+# SK Rockets (Bedrock add-on)
 
-Type `/sk 64` and you get 64 firework rockets for elytra flight. Any number from 1 to 6400 works. Stacks go into your inventory and whatever doesn't fit drops at your feet.
+Type `/sk 64` and you get 64 flight duration 3 firework rockets for elytra flight. Any number from 1 to 6400 works. Stacks go into your inventory and whatever doesn't fit drops at your feet.
 
 Only operators can use it. Players without op don't see `/sk` when they type `/` in chat, and they can't run it. The world host is an operator by default. To give someone access, open the pause menu, pick the player and set them to Operator. Bedrock has no way to hide a command from the people who are allowed to run it, so you'll still see it in your own list.
 
+## How flight duration 3 works
+
+The Script API can't set a rocket's flight duration, so the pack ships `structures/skrockets/rocket3.mcstructure`, a structure holding one flight duration 3 rocket. The first time someone runs `/sk`, the pack places that structure (item only, no blocks), copies the rocket and deletes the item. Every rocket after that is a copy. `tools/make_structure.py` generates the structure file; `build.sh` runs it for you.
+
 ## Install
 
-1. Run `./build.sh` (or grab the prebuilt `RocketKit.mcaddon`).
+1. Run `./build.sh` (or grab the prebuilt `SKRockets.mcaddon`).
 2. Open the `.mcaddon` on the device running Minecraft. It imports itself.
-3. World settings, Behavior Packs, activate Rocket Kit.
+3. World settings, Behavior Packs, activate SK Rockets.
 4. Leave cheats off and leave every Experiments toggle off. The pack doesn't need either.
 
 Needs Minecraft Bedrock 1.21.90 or newer. It uses the stable Script API custom command system, so no beta APIs.
