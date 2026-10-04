@@ -18,8 +18,8 @@ const BOOK_ENCHANTS = [
   { id: "unbreaking", name: "Unbreaking III", level: 3 },
   { id: "mending", name: "Mending", level: 1 },
 ];
-const STRUCTURE = "skymax:rocket3";
-const TEMPLATE_TAG = "skymax_template";
+const STRUCTURE = "skyultra:rocket3";
+const TEMPLATE_TAG = "skyultra_template";
 // 100 full stacks. Anything bigger just floods the floor with item entities and lags the world.
 const MAX_AMOUNT = 6400;
 
@@ -36,7 +36,7 @@ function getTemplate(player) {
     // includeBlocks: false means only the item entity appears. No blocks in the world get touched.
     world.structureManager.place(STRUCTURE, player.dimension, origin, { includeBlocks: false, includeEntities: true });
   } catch (error) {
-    console.warn(`Sky Kit Max: couldn't place ${STRUCTURE}: ${error}`);
+    console.warn(`Sky Kit Ultra: couldn't place ${STRUCTURE}: ${error}`);
     return undefined;
   }
 
@@ -165,6 +165,11 @@ function runForPlayer(origin, commandName, action) {
   if (!(player instanceof Player)) {
     return { status: CustomCommandStatus.Failure, message: `Only players can use /${commandName}` };
   }
+  // The game already blocks non-operators through permissionLevel. This is a second lock in case that ever slips.
+  const level = player.commandPermissionLevel;
+  if (typeof level === "number" && level < CommandPermissionLevel.GameDirectors) {
+    return { status: CustomCommandStatus.Failure, message: `You need to be an operator to use /${commandName}` };
+  }
   system.run(() => action(player));
   return { status: CustomCommandStatus.Success };
 }
@@ -180,7 +185,7 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
   // The game also registers the un-namespaced forms, so players can just type /sk, /er, /gc and the rest.
   // GameDirectors means operators only. Players without op can't run them, and they don't show up when they type "/".
   const operatorCommand = (commandName, description, extra = {}) => ({
-    name: `skymax:${commandName}`,
+    name: `skyultra:${commandName}`,
     description,
     permissionLevel: CommandPermissionLevel.GameDirectors,
     cheatsRequired: false,

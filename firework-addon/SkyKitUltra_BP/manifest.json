@@ -1,9 +1,9 @@
 {
   "format_version": 2,
   "header": {
-    "name": "Sky Kit Max",
+    "name": "Sky Kit Ultra",
     "description": "Operator commands: /sk rockets (flight 3), /er XP bottles, /ep ender pearls, /gc golden carrots, /bm Unbreaking III and Mending, /cr creative, /su survival. No cheats needed.",
-    "uuid": "706a6513-af6c-4b9b-a77f-f7e59949d4f3",
+    "uuid": "fb08cbab-ded2-409d-82cf-69da46642a51",
     "version": [1, 0, 0],
     "min_engine_version": [1, 21, 90]
   },
@@ -11,7 +11,7 @@
     {
       "type": "script",
       "language": "javascript",
-      "uuid": "ce910f7f-e989-4f89-8fab-df869cd1cb26",
+      "uuid": "6590d47a-2a43-4a00-848a-96ff72089c3e",
       "entry": "scripts/main.js",
       "version": [1, 0, 0]
     }
