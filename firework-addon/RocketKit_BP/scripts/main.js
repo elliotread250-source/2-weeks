@@ -40,7 +40,7 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
   // GameDirectors means operators only. Players without op can't run it, and it doesn't show up when they type "/".
   customCommandRegistry.registerCommand(
     {
-      name: "fireworkcmd:firework",
+      name: "rocketkit:firework",
       description: "Give yourself firework rockets for elytra flight",
       permissionLevel: CommandPermissionLevel.GameDirectors,
       cheatsRequired: false,

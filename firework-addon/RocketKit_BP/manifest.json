@@ -1,19 +1,19 @@
 {
   "format_version": 2,
   "header": {
-    "name": "Firework Command",
+    "name": "Rocket Kit",
     "description": "Type /firework <amount> to get that many flight duration firework rockets. No cheats needed.",
-    "uuid": "e64e43bd-8c5c-47ab-902d-562574e194c6",
-    "version": [1, 0, 0],
+    "uuid": "50411295-db78-44b6-a8ac-34fae670a725",
+    "version": [2, 0, 0],
     "min_engine_version": [1, 21, 90]
   },
   "modules": [
     {
       "type": "script",
       "language": "javascript",
-      "uuid": "bb18cb64-095f-418f-895e-f5a4d39bb031",
+      "uuid": "4729d6f4-c695-4fe8-b0e0-8270e02e94fe",
       "entry": "scripts/main.js",
-      "version": [1, 0, 0]
+      "version": [2, 0, 0]
     }
   ],
   "dependencies": [

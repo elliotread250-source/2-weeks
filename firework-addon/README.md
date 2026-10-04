@@ -1,4 +1,4 @@
-# Firework Command (Bedrock add-on)
+# Rocket Kit (Bedrock add-on)
 
 Type `/firework 64` and you get 64 firework rockets for elytra flight. Any number from 1 to 6400 works. Stacks go into your inventory and whatever doesn't fit drops at your feet.
 
@@ -6,9 +6,9 @@ Only operators can use it. Players without op don't see `/firework` when they ty
 
 ## Install
 
-1. Run `./build.sh` (or grab the prebuilt `FireworkCommand.mcaddon`).
+1. Run `./build.sh` (or grab the prebuilt `RocketKit.mcaddon`).
 2. Open the `.mcaddon` on the device running Minecraft. It imports itself.
-3. World settings, Behavior Packs, activate Firework Command.
+3. World settings, Behavior Packs, activate Rocket Kit.
 4. Leave cheats off and leave every Experiments toggle off. The pack doesn't need either.
 
 Needs Minecraft Bedrock 1.21.90 or newer. It uses the stable Script API custom command system, so no beta APIs.
