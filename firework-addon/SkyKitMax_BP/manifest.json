@@ -1,9 +1,9 @@
 {
   "format_version": 2,
   "header": {
-    "name": "Sky Kit Pro",
-    "description": "Operator commands: /sk rockets (flight 3), /er XP bottles, /ep ender pearls, /bm adds Unbreaking III and Mending to your held item. No cheats needed.",
-    "uuid": "9c134441-78fb-4504-a62d-f7891a19e58e",
+    "name": "Sky Kit Max",
+    "description": "Operator commands: /sk rockets (flight 3), /er XP bottles, /ep ender pearls, /gc golden carrots, /bm Unbreaking III and Mending, /cr creative, /su survival. No cheats needed.",
+    "uuid": "706a6513-af6c-4b9b-a77f-f7e59949d4f3",
     "version": [1, 0, 0],
     "min_engine_version": [1, 21, 90]
   },
@@ -11,7 +11,7 @@
     {
       "type": "script",
       "language": "javascript",
-      "uuid": "22e968ff-1084-4170-9913-dddc80028bfb",
+      "uuid": "ce910f7f-e989-4f89-8fab-df869cd1cb26",
       "entry": "scripts/main.js",
       "version": [1, 0, 0]
     }

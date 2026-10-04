@@ -5,6 +5,7 @@ import {
   CustomCommandParamType,
   CustomCommandStatus,
   EnchantmentType,
+  GameMode,
   ItemStack,
   Player,
 } from "@minecraft/server";
@@ -12,12 +13,13 @@ import {
 const ROCKET = "minecraft:firework_rocket";
 const XP_BOTTLE = "minecraft:experience_bottle";
 const ENDER_PEARL = "minecraft:ender_pearl";
+const GOLDEN_CARROT = "minecraft:golden_carrot";
 const BOOK_ENCHANTS = [
   { id: "unbreaking", name: "Unbreaking III", level: 3 },
   { id: "mending", name: "Mending", level: 1 },
 ];
-const STRUCTURE = "skypro:rocket3";
-const TEMPLATE_TAG = "skypro_template";
+const STRUCTURE = "skymax:rocket3";
+const TEMPLATE_TAG = "skymax_template";
 // 100 full stacks. Anything bigger just floods the floor with item entities and lags the world.
 const MAX_AMOUNT = 6400;
 
@@ -34,7 +36,7 @@ function getTemplate(player) {
     // includeBlocks: false means only the item entity appears. No blocks in the world get touched.
     world.structureManager.place(STRUCTURE, player.dimension, origin, { includeBlocks: false, includeEntities: true });
   } catch (error) {
-    console.warn(`Sky Kit Pro: couldn't place ${STRUCTURE}: ${error}`);
+    console.warn(`Sky Kit Max: couldn't place ${STRUCTURE}: ${error}`);
     return undefined;
   }
 
@@ -105,6 +107,17 @@ function giveEnderPearls(player, amount) {
   player.sendMessage(`§aGave you ${amount} ${label}` + droppedNote(dropped));
 }
 
+function giveGoldenCarrots(player, amount) {
+  const dropped = giveItems(player, amount, (count) => new ItemStack(GOLDEN_CARROT, count));
+  const label = amount === 1 ? "golden carrot" : "golden carrots";
+  player.sendMessage(`§aGave you ${amount} ${label}` + droppedNote(dropped));
+}
+
+function switchGameMode(player, mode, label) {
+  player.setGameMode(mode);
+  player.sendMessage(`§aSwitched you to ${label}`);
+}
+
 function enchantHeldItem(player) {
   const inventory = player.getComponent("minecraft:inventory")?.container;
   const item = inventory?.getItem(player.selectedSlotIndex);
@@ -164,10 +177,10 @@ function runGive(origin, amount, commandName, give) {
 }
 
 system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
-  // The game also registers the un-namespaced forms, so players can just type /sk, /er, /ep and /bm.
+  // The game also registers the un-namespaced forms, so players can just type /sk, /er, /gc and the rest.
   // GameDirectors means operators only. Players without op can't run them, and they don't show up when they type "/".
   const operatorCommand = (commandName, description, extra = {}) => ({
-    name: `skypro:${commandName}`,
+    name: `skymax:${commandName}`,
     description,
     permissionLevel: CommandPermissionLevel.GameDirectors,
     cheatsRequired: false,
@@ -184,8 +197,15 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
   registerGive("sk", "Give yourself flight duration 3 firework rockets", giveRockets);
   registerGive("er", "Give yourself XP bottles", giveXpBottles);
   registerGive("ep", "Give yourself ender pearls", giveEnderPearls);
+  registerGive("gc", "Give yourself golden carrots", giveGoldenCarrots);
   customCommandRegistry.registerCommand(
     operatorCommand("bm", "Add Unbreaking III and Mending to the item you're holding"),
     (origin) => runForPlayer(origin, "bm", enchantHeldItem)
+  );
+  customCommandRegistry.registerCommand(operatorCommand("cr", "Switch yourself to creative"), (origin) =>
+    runForPlayer(origin, "cr", (player) => switchGameMode(player, GameMode.Creative, "creative"))
+  );
+  customCommandRegistry.registerCommand(operatorCommand("su", "Switch yourself to survival"), (origin) =>
+    runForPlayer(origin, "su", (player) => switchGameMode(player, GameMode.Survival, "survival"))
   );
 });

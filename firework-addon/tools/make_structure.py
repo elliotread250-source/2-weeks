@@ -61,7 +61,7 @@ item_entity = {
     "PickupDelay": (SHORT, 32767),
     "OnGround": (BYTE, 1),
     # Lets the script find this exact entity instead of some random rocket lying nearby.
-    "Tags": (LIST, (STRING, ["skypro_template"])),
+    "Tags": (LIST, (STRING, ["skymax_template"])),
 }
 
 structure = {
