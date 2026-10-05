@@ -84,21 +84,7 @@
       <div class="lobby-cols">
         <div class="card controls">
           <h3>Controls</h3>
-          <table>
-            <tr><td>WASD</td><td>Move</td></tr>
-            <tr><td>Shift</td><td>Sprint</td></tr>
-            <tr><td>Space</td><td>Jump / leave bus / open glider</td></tr>
-            <tr><td>Mouse</td><td>Look, LMB fire / place, RMB aim</td></tr>
-            <tr><td>1</td><td>Pickaxe</td></tr>
-            <tr><td>2 - 6</td><td>Inventory slots (or mouse wheel)</td></tr>
-            <tr><td>Q</td><td>Toggle build mode</td></tr>
-            <tr><td>Z X C V</td><td>Wall, floor, ramp, cone</td></tr>
-            <tr><td>RMB / T</td><td>Swap build material (build mode)</td></tr>
-            <tr><td>G</td><td>Edit build, G again to confirm, RMB reset</td></tr>
-            <tr><td>E</td><td>Pick up / hold to open chests</td></tr>
-            <tr><td>R</td><td>Reload</td></tr>
-            <tr><td>M</td><td>Map</td></tr>
-          </table>
+          <table id="controls-table"></table>
         </div>
         <div class="card rules">
           <h3>The drop</h3>
@@ -109,9 +95,8 @@
         </div>
       </div>
       <button id="play-btn">PLAY</button>
-      <div class="sens">
-        <label>Mouse sensitivity <input id="sens" type="range" min="0.4" max="2.5" step="0.05" value="1" /></label>
-        <label><input id="graphics" type="checkbox" checked /> Shadows</label>
+      <div class="lobby-actions">
+        <button id="settings-btn" class="ghost">SETTINGS &amp; KEYBINDS</button>
       </div>
     </div>
   </div>
@@ -120,7 +105,35 @@
     <div class="card">
       <h2>Paused</h2>
       <button id="resume-btn">RESUME</button>
+      <button id="pause-settings-btn" class="ghost">SETTINGS &amp; KEYBINDS</button>
       <button id="quit-btn" class="ghost">RETURN TO LOBBY</button>
+    </div>
+  </div>
+
+  <div id="settings" class="hidden">
+    <div class="settings-panel">
+      <div class="settings-head">
+        <h2>Settings</h2>
+        <button id="settings-close" class="ghost">DONE</button>
+      </div>
+      <div class="settings-grid">
+        <section class="settings-col">
+          <h3>Game</h3>
+          <label class="row"><span>Mouse sensitivity</span><input id="sens" type="range" min="0.2" max="3" step="0.05" /><output id="sens-out"></output></label>
+          <label class="row"><span>Confirm edit on release</span><input id="confirm-release" type="checkbox" /></label>
+          <label class="row"><span>Shadows</span><input id="graphics" type="checkbox" /></label>
+          <label class="row"><span>Detail</span>
+            <select id="detail"><option value="high">High</option><option value="low">Low (faster)</option></select>
+          </label>
+          <p class="hint">Shadows and detail apply on the next match.</p>
+        </section>
+        <section class="settings-col">
+          <h3>Keybinds</h3>
+          <p class="hint">Click a key, then press the new key or mouse button. Esc cancels.</p>
+          <div id="bind-list"></div>
+          <button id="binds-reset" class="ghost small">RESET TO DEFAULTS</button>
+        </section>
+      </div>
     </div>
   </div>
 

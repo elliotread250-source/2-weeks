@@ -17,6 +17,7 @@ import { HUD } from './hud.js';
 import { FX } from './fx.js';
 import { PlayerController } from './player.js';
 import { sfx } from './audio.js';
+import { label } from './binds.js';
 import { rand, pick } from './util.js';
 
 const BOT_NAMES = [
@@ -121,7 +122,7 @@ export class Game {
     this.sun = sun;
 
     this.collision = new CollisionWorld(terrainHeight);
-    this.world = new World(scene, this.collision);
+    this.world = new World(scene, this.collision, { detail: opts.detail });
     this.world.build();
     this.builds = new BuildSystem(scene, this.collision);
     this.builds.onDestroyed = (p, mode) => {
@@ -180,7 +181,7 @@ export class Game {
     this.controller.camYaw = Math.atan2(-this.bus.dir.x, -this.bus.dir.z) + Math.PI * 0.35;
     this.controller.camPitch = -0.35;
     this.hud.show(true);
-    this.hud.message('BATTLE BUS', 'Press SPACE to jump', 4);
+    this.hud.message('BATTLE BUS', `Press ${label('jump')} to jump`, 4);
     sfx('horn');
     this.controller.lock();
     this.clock.start();
@@ -208,7 +209,7 @@ export class Game {
     f.pos.copy(this.bus.pos).add(new THREE.Vector3(rand(-1, 1), -4, rand(-1, 1)));
     f.vel.copy(this.bus.dir).multiplyScalar(8);
     f.model.root.visible = true;
-    if (f.isPlayer) this.hud.message('', 'Look down + W to dive. SPACE opens the glider.', 3);
+    if (f.isPlayer) this.hud.message('', `Look down + ${label('forward')} to dive. ${label('jump')} opens the glider.`, 3);
   }
 
   updateBus(dt) {
@@ -493,5 +494,8 @@ export class Game {
     this.sun.position.set(focus.x + 80, focus.y + 140, focus.z + 50);
     this.sun.target.position.set(focus.x, focus.y, focus.z);
     if (this.world.clouds) this.world.clouds.position.x = (this.time * 1.5) % 200;
+    if (this.world.sunSprite) {
+      this.world.sunSprite.position.copy(this.camera.position).add(new THREE.Vector3(80, 140, 50).normalize().multiplyScalar(1100));
+    }
   }
 }

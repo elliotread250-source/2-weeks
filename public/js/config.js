@@ -136,9 +136,3 @@ export const LOOT_WEIGHTS = {
   floor: [40, 30, 18, 9, 3],
   chest: [10, 30, 32, 20, 8],
 };
-
-export const KEYS = {
-  build: 'KeyQ', edit: 'KeyG', interact: 'KeyE', reload: 'KeyR', map: 'KeyM',
-  wall: 'KeyZ', floor: 'KeyX', ramp: 'KeyC', cone: 'KeyV',
-  matCycle: 'KeyT',
-};

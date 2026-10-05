@@ -3,6 +3,7 @@ import { WEAPONS, CONSUMABLES, RARITIES, PLAYER } from './config.js';
 import { TERRAIN_SIZE, paintMinimap, POIS, poiAt } from './terrain.js';
 import { formatTime } from './util.js';
 import { iconSVG } from './icons.js';
+import { label, settings } from './binds.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -250,9 +251,10 @@ export class HUD {
     }
     this.set('building', this.root, c.buildMode ? 'building' : '', 'className');
     for (const [k, el] of Object.entries(this.pieceEls)) {
+      this.set(`pk${k}`, el.querySelector('b'), label(k));
       this.set(`pc${k}`, el, `piece ${c.buildPiece === k ? 'sel' : ''}`, 'className');
     }
-    this.set('mode', this.modeTag, c.editMode ? 'EDIT MODE' : c.buildMode ? `BUILD: ${c.buildMat.toUpperCase()}` : '');
+    this.set('mode', this.modeTag, c.editMode ? (settings.confirmEditOnRelease ? `EDIT: HOLD ${label('fire')} OVER TILES, LET GO TO CONFIRM` : `EDIT: ${label('edit')} TO CONFIRM`) : c.buildMode ? `BUILD: ${c.buildMat.toUpperCase()}` : '');
 
     // Counters.
     this.set('alive', this.alive, String(game.aliveCount()));

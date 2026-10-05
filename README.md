@@ -26,10 +26,12 @@ No build step. `server.js` is a zero-dependency static server that also serves t
 | Q | Toggle build mode |
 | Z X C V (or F1-F4) | Wall, floor, ramp, cone |
 | RMB or T in build mode | Cycle wood / brick / metal |
-| G | Edit the build you're looking at. G again confirms, RMB resets |
+| F | Edit the build you're looking at. Hold LMB over tiles, let go to confirm (or F again if you turn confirm-on-release off). RMB resets |
 | E | Pick up, hold to open chests and ammo boxes |
 | R | Reload |
 | M | Full map |
+
+Every key is rebindable from **Settings & Keybinds** in the lobby or pause menu, including mouse buttons and side buttons. Binds and settings save in your browser.
 
 ## What's in it
 

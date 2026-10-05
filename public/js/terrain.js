@@ -2,7 +2,7 @@
 // central hill, industrial north, harbour south-west, beach to the south),
 // painted with Fortnite's saturated greens and sandy beaches.
 import * as THREE from 'three';
-import { fbm, smoothstep, lerp, clamp } from './util.js';
+import { fbm, smoothstep, lerp, clamp, valueNoise } from './util.js';
 import { WATER_LEVEL } from './config.js';
 
 export const TERRAIN_SIZE = 560;
@@ -26,6 +26,34 @@ export const POIS = [
   { id: 'security', name: 'Security Sands', rebirth: 'Security Area', x: 10, z: -158, pad: 20, height: 4, ground: 'asphalt' },
   { id: 'construction', name: 'Crane Corner', rebirth: 'Construction Site', x: 88, z: 30, pad: 22, height: 13, ground: 'dirt' },
 ];
+
+// Roads linking POIs, like Rebirth's service roads. Each runs from pad edge
+// to pad edge.
+const ROAD_LINKS = [
+  ['prison', 'control'], ['prison', 'security'], ['prison', 'construction'], ['prison', 'chem'],
+  ['construction', 'hq'], ['hq', 'decon'], ['decon', 'bio'], ['bio', 'security'],
+  ['chem', 'factory'], ['factory', 'harbor'], ['harbor', 'shore'], ['shore', 'living'],
+  ['living', 'construction'], ['control', 'living'], ['control', 'factory'],
+];
+
+export const ROADS = ROAD_LINKS.map(([a, b]) => {
+  const A = POIS.find((p) => p.id === a), B = POIS.find((p) => p.id === b);
+  const dx = B.x - A.x, dz = B.z - A.z, len = Math.hypot(dx, dz);
+  const ux = dx / len, uz = dz / len;
+  const ia = Math.min(len * 0.4, A.pad * 0.75), ib = Math.min(len * 0.4, B.pad * 0.75);
+  return { x0: A.x + ux * ia, z0: A.z + uz * ia, x1: B.x - ux * ib, z1: B.z - uz * ib, a, b };
+});
+
+export function distToRoad(x, z) {
+  let best = Infinity;
+  for (const r of ROADS) {
+    const dx = r.x1 - r.x0, dz = r.z1 - r.z0;
+    const t = Math.max(0, Math.min(1, ((x - r.x0) * dx + (z - r.z0) * dz) / (dx * dx + dz * dz)));
+    const d = Math.hypot(x - (r.x0 + dx * t), z - (r.z0 + dz * t));
+    if (d < best) best = d;
+  }
+  return best;
+}
 
 const GROUND_COLORS = {
   concrete: new THREE.Color('#b9b4a8'),
@@ -104,6 +132,12 @@ export function buildTerrainMesh() {
   const grassA = new THREE.Color('#5ccc46');
   const grassB = new THREE.Color('#3fae3a');
   const rock = new THREE.Color('#9a9488');
+  const rockDark = new THREE.Color('#7b766d');
+  const meadow = new THREE.Color('#86d957');
+  const clover = new THREE.Color('#2f9a3c');
+  const dirt = new THREE.Color('#a8865a');
+  const foam = new THREE.Color('#f4fbff');
+  const seabed = new THREE.Color('#5aa6b3');
   const c = new THREE.Color();
 
   for (let i = 0; i < pos.count; i++) {
@@ -119,9 +153,21 @@ export function buildTerrainMesh() {
 
     const n = fbm(x * 0.05, z * 0.05, 2) * 0.5 + 0.5;
     c.copy(grassA).lerp(grassB, n);
+    // Lighter meadow patches, darker clover and the odd bare dirt patch.
+    const m = fbm(x * 0.013 + 40, z * 0.013 - 12, 3);
+    c.lerp(meadow, smoothstep(0.15, 0.45, m) * 0.55);
+    c.lerp(clover, smoothstep(-0.2, -0.5, m) * 0.5);
+    c.lerp(dirt, smoothstep(0.42, 0.6, fbm(x * 0.03 - 9, z * 0.03 + 21, 2)) * 0.75);
+    c.multiplyScalar(0.94 + valueNoise(x * 0.9, z * 0.9) * 0.06);
     if (h < 2.2) c.copy(sand).lerp(c, smoothstep(1.2, 2.2, h));
     if (h < 0.3) c.copy(wetSand);
+    if (h < 0.35 && h > -0.5) c.lerp(foam, smoothstep(-0.5, 0.05, h) * smoothstep(0.35, 0.05, h) * 0.7);
+    if (h < -0.5) c.copy(wetSand).lerp(seabed, smoothstep(-0.5, -6, h));
     c.lerp(rock, smoothstep(0.55, 0.95, slope));
+    c.lerp(rockDark, smoothstep(0.95, 1.4, slope) * 0.6);
+    // Worn verges along the roads.
+    const rd = distToRoad(x, z);
+    if (rd < 6 && h > 0.6) c.lerp(dirt, smoothstep(6, 3.5, rd) * 0.55);
 
     for (const p of POIS) {
       const d = Math.hypot(x - p.x, z - p.z);
@@ -139,16 +185,39 @@ export function buildTerrainMesh() {
 }
 
 export function buildWater() {
-  const geo = new THREE.PlaneGeometry(2400, 2400, 1, 1);
+  // Subdivided near the island so the waves have vertices to move; the far
+  // ocean is a flat skirt.
+  const geo = new THREE.PlaneGeometry(900, 900, 150, 150);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshPhongMaterial({
-    color: '#2fb6e8', transparent: true, opacity: 0.82, shininess: 90, specular: '#bff2ff',
+    color: '#27b3e6', transparent: true, opacity: 0.8, shininess: 110, specular: '#d8f6ff',
   });
+  const uniforms = { uTime: { value: 0 } };
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying float vWave;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float w1 = sin(position.x * 0.08 + uTime * 1.3) * 0.18;
+        float w2 = sin(position.z * 0.11 - uTime * 1.1) * 0.14;
+        float w3 = sin((position.x + position.z) * 0.21 + uTime * 2.1) * 0.06;
+        transformed.y += w1 + w2 + w3;
+        vWave = w1 + w2 + w3;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vWave;')
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        gl_FragColor.rgb += vec3(0.10, 0.16, 0.18) * smoothstep(0.18, 0.36, vWave);`);
+  };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = WATER_LEVEL;
   mesh.receiveShadow = true;
-
-  // Shallow-water foam ring drawn as a slightly lighter disc under the surface.
+  const skirt = new THREE.Mesh(
+    new THREE.RingGeometry(440, 2400, 48, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshPhongMaterial({ color: '#1f9fd6', shininess: 60, specular: '#bdeeff' }),
+  );
+  skirt.position.y = -0.05;
+  mesh.add(skirt);
+  mesh.userData.uniforms = uniforms;
   return mesh;
 }
 

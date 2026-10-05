@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeBox, makeSlope } from './collision.js';
-import { terrainHeight, POIS, buildTerrainMesh, buildWater, TERRAIN_SIZE } from './terrain.js';
+import { terrainHeight, POIS, buildTerrainMesh, buildWater, TERRAIN_SIZE, distToRoad } from './terrain.js';
+import { addStaticDetail, addInstancedDetail, addPalms } from './decor.js';
 import { mapRand } from './util.js';
 import { WATER_LEVEL } from './config.js';
 import { weakPointTexture } from './textures.js';
@@ -223,9 +224,10 @@ function compose(x, y, z, sx, sy, sz, ry = 0, rx = 0) {
 }
 
 export class World {
-  constructor(scene, collision) {
+  constructor(scene, collision, opts = {}) {
     this.scene = scene;
     this.col = collision;
+    this.detail = opts.detail || 'high';
     this.sb = new StaticBuilder(collision);
     this.lootSpots = [];
     this.harvestables = [];
@@ -254,10 +256,13 @@ export class World {
     this.buildSecurity();
     this.buildConstruction();
     this.buildLighthouse();
+    addStaticDetail(this, this.detail);
+    addPalms(this, this.detail);
     this.scatterNature();
     this.scatterWildLoot();
 
     this.scene.add(this.sb.finish());
+    addInstancedDetail(this, this.detail);
     for (const p of Object.values(this.pools)) {
       p.mesh.instanceMatrix.needsUpdate = true;
       if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
@@ -286,6 +291,8 @@ export class World {
     const white = new THREE.MeshLambertMaterial({ color: '#ffffff' });
     this.pools = {
       trunk: new Pool(trunkGeo, lam('#8a5a2b'), 400),
+      palmTrunk: new Pool(new THREE.CylinderGeometry(0.2, 0.3, 1, 7).translate(0, 0.5, 0), lam('#a07a4f'), 300),
+      frond: new Pool(new THREE.ConeGeometry(0.6, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5), new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true }), 600, true),
       pine: new Pool(pineGeo, lam('#2f9e48'), 800),
       round: new Pool(roundGeo, white, 900, true),
       rock: new Pool(rockGeo, white, 200, true),
@@ -348,7 +355,16 @@ export class World {
               ops.push({ c, w: 1.6, y0: 1.2, y1: 2.6 });
             }
           }
-          this.wallWithOpenings(s.axis, s.a0, s.a1, s.c0, s.c1, yb, fh, ops, L === 0 ? color : (o.upperColor || color));
+          this.wallWithOpenings(s.axis, s.a0, s.a1, s.c0, s.c1, yb, fh, ops, L === 0 ? color : (o.upperColor || color), trim);
+        }
+        // Skirting along the base of the ground floor.
+        if (L === 0) {
+          const k = 0.08, hh = 0.5;
+          // Only on sides without a door, so nothing trips you at the entrance.
+          if (!doors.includes('n')) sb.box(x0 - k, yb, z0 - k, x1 + k, yb + hh, z0 + 0.05, trim);
+          if (!doors.includes('s')) sb.box(x0 - k, yb, z1 - 0.05, x1 + k, yb + hh, z1 + k, trim);
+          if (!doors.includes('w')) sb.box(x0 - k, yb, z0 + 0.05, x0 + 0.05, yb + hh, z1 - 0.05, trim);
+          if (!doors.includes('e')) sb.box(x1 - 0.05, yb, z0 + 0.05, x1 + k, yb + hh, z1 - 0.05, trim);
         }
         // Trim band between floors.
         sb.box(x0 - 0.15, yb + fh - 0.35, z0 - 0.15, x1 + 0.15, yb + fh, z1 + 0.15, trim, false);
@@ -408,12 +424,12 @@ export class World {
     if (pitched) {
       sb.pyramid(x0 - 0.4, z0 - 0.4, x1 + 0.4, z1 + 0.4, y0 + floors * fh, pitched.rise ?? 2.6, pitched.color);
     }
-    const b = { x, z, w, d, floors, fh, base, top: y0 + floors * fh };
+    const b = { x, z, w, d, floors, fh, base, top: y0 + floors * fh, pitched: !!pitched, walls, roofAccess, trim, color, poi, doors };
     this.buildings.push(b);
     return b;
   }
 
-  wallWithOpenings(axis, a0, a1, c0, c1, yb, h, ops, color) {
+  wallWithOpenings(axis, a0, a1, c0, c1, yb, h, ops, color, trim = null) {
     const sb = this.sb;
     ops.sort((p, q2) => p.c - q2.c);
     const seg = (s0, s1, y0, y1) => {
@@ -421,12 +437,31 @@ export class World {
       if (axis === 'x') sb.box(s0, yb + y0, c0, s1, yb + y1, c1, color);
       else sb.box(c0, yb + y0, s0, c1, yb + y1, s1, color);
     };
+    // Trim pieces stick out past both faces of the wall.
+    const trimBox = (s0, s1, y0, y1, out) => {
+      if (axis === 'x') sb.box(s0, yb + y0, c0 - out, s1, yb + y1, c1 + out, trim);
+      else sb.box(c0 - out, yb + y0, s0, c1 + out, yb + y1, s1, trim);
+    };
     let cur = a0;
     for (const op of ops) {
       const oa = op.c - op.w / 2, ob = op.c + op.w / 2;
       seg(cur, oa, 0, h);
       if (op.y0 > 0) seg(oa, ob, 0, op.y0);
       seg(oa, ob, op.y1, h);
+      if (trim && op.y1 < h) {
+        if (op.y0 > 0) {
+          // Window: sill, lintel and side frames.
+          trimBox(oa - 0.18, ob + 0.18, op.y0 - 0.12, op.y0, 0.16);
+          trimBox(oa - 0.12, ob + 0.12, op.y1, op.y1 + 0.14, 0.08);
+          trimBox(oa - 0.12, oa, op.y0, op.y1, 0.06);
+          trimBox(ob, ob + 0.12, op.y0, op.y1, 0.06);
+        } else {
+          // Door frame.
+          trimBox(oa - 0.16, oa, 0, op.y1, 0.08);
+          trimBox(ob, ob + 0.16, 0, op.y1, 0.08);
+          trimBox(oa - 0.16, ob + 0.16, op.y1, op.y1 + 0.18, 0.1);
+        }
+      }
       cur = ob;
     }
     seg(cur, a1, 0, h);
@@ -501,6 +536,44 @@ export class World {
       type: 'tree', mat: 'wood', hp: Math.round(150 * s), yieldPer: 9, parts,
       center: { x, y: g + 1.4, z },
       collider: makeBox(x - r, g - 1, z - r, x + r, g + 7 * s, z + r, 'harvest', null),
+    });
+  }
+
+  palm(x, z) {
+    const g = this.ground(x, z);
+    const P = this.pools;
+    const parts = [];
+    const H = rr(6, 7.8), segs = 4;
+    const lean = rr(0, Math.PI * 2), tilt = rr(0.08, 0.22);
+    let px = x, py = g - 0.2, pz = z;
+    const axis = new THREE.Vector3(Math.cos(lean), 0, Math.sin(lean));
+    for (let i = 0; i < segs; i++) {
+      const len = H / segs;
+      const q2 = new THREE.Quaternion().setFromAxisAngle(axis, tilt * (1 + i * 0.7));
+      const w = 1 - i * 0.12;
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(px, py, pz), q2, new THREE.Vector3(w, len + 0.08, w));
+      parts.push({ pool: P.palmTrunk, m });
+      const up = new THREE.Vector3(0, len, 0).applyQuaternion(q2);
+      px += up.x; py += up.y; pz += up.z;
+    }
+    const greens = ['#3fb34f', '#4cc95a', '#2f9e48'];
+    for (let i = 0; i < 7; i++) {
+      const yaw = (i / 7) * Math.PI * 2 + rr(-0.2, 0.2);
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(px, py, pz),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(rr(0.35, 0.65), yaw, 0, 'YXZ')),
+        new THREE.Vector3(1.1, 0.16, rr(2.8, 3.6)),
+      );
+      parts.push({ pool: P.frond, m, color: greens[i % 3] });
+    }
+    for (let i = 0; i < 3; i++) {
+      parts.push({ pool: P.round, m: compose(px + rr(-0.3, 0.3), py - 0.35, pz + rr(-0.3, 0.3), 0.22, 0.22, 0.22), color: '#6d4c2f' });
+    }
+    for (const p of parts) p.index = p.pool.add(p.m, p.color);
+    return this.addHarvest({
+      type: 'tree', mat: 'wood', hp: 170, yieldPer: 9, parts,
+      center: { x, y: g + 1.4, z },
+      collider: makeBox(x - 0.35, g - 1, z - 0.35, x + 0.35, g + H, z + 0.35, 'harvest', null),
     });
   }
 
@@ -630,6 +703,7 @@ export class World {
     if (el.dead) return;
     el.dead = true;
     for (const c of el.colliders) this.col.remove(c);
+    if (el.onDestroy) el.onDestroy();
     const attr = this.sb.mesh.geometry.attributes.position;
     for (const [start, count] of el.ranges) {
       attr.array.fill(0, start * 3, (start + count) * 3);
@@ -719,7 +793,7 @@ export class World {
       }
       if (h.shakeT <= 0) this.shaking.splice(i, 1);
     }
-    if (this.water) this.water.position.y = WATER_LEVEL + Math.sin(time * 0.8) * 0.06;
+    if (this.water) this.water.userData.uniforms.uTime.value = time;
     // Weak point marker on whatever the player is harvesting.
     if (focusHarvest && focusHarvest.weak && !focusHarvest.dead) {
       const w = focusHarvest.weak;
@@ -955,6 +1029,7 @@ export class World {
       const h = this.ground(x, z);
       if (h < 2.5) continue;
       if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < p.pad + 3)) continue;
+      if (distToRoad(x, z) < 5) continue;
       const slope = Math.abs(this.ground(x + 1, z) - this.ground(x - 1, z)) + Math.abs(this.ground(x, z + 1) - this.ground(x, z - 1));
       if (slope > 2.2) continue;
       if (!this.free(x, z, 1.6, 1.6)) continue;
