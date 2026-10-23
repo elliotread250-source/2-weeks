@@ -1,7 +1,9 @@
 // Entry point: lobby, settings/keybinds screen, then the match.
 import { Game } from '../client/game.js';
 import { NetHost } from '../client/nethost.js';
-import { initAccount } from './account.js';
+import { initAccount, account } from './account.js';
+import { currentLoadout, refreshLoadout } from '../client/loadout.js';
+import { initLocker } from './locker.js';
 import { initAudio } from '../audio/audio.js';
 import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from '../client/binds.js';
 
@@ -70,7 +72,6 @@ function closeSettings() {
   if (game) game.rebinding = false;
   $('#settings').classList.add('hidden');
   renderControls();
-initAccount();
 }
 
 function finishListen(code) {
@@ -125,7 +126,7 @@ $('#settings-close').addEventListener('click', closeSettings);
 
 function launch(opts) {
   try {
-    game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high', ...opts });
+    game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high', loadout: currentLoadout(), name: $('#player-name').value.trim() || undefined, ...opts });
     window.__game = game;
     $('#lobby').classList.add('hidden');
     $('#loading').classList.remove('show');
@@ -158,7 +159,7 @@ async function playOnline(resumeToken = null) {
   try { localStorage.setItem('twoweeks.name', name); } catch { /* private mode */ }
   $('#online-btn').disabled = true;
   try {
-    const host = await NetHost.connect(wsUrl(), { name, resumeToken, onStatus: (t) => { status.textContent = t; } });
+    const host = await NetHost.connect(wsUrl(), { name, resumeToken, loadout: currentLoadout(), onStatus: (t) => { status.textContent = t; } });
     try { sessionStorage.setItem(TOKEN_KEY, host.token); } catch { /* private mode */ }
     host.onClosed = () => {
       // Dropped mid-match: the server keeps our fighter for 30 s, so try to resume.
@@ -190,4 +191,7 @@ $('#quit-btn').addEventListener('click', leave);
 $('#again-btn').addEventListener('click', leave);
 
 renderControls();
+account.listeners.push(refreshLoadout);
 initAccount();
+refreshLoadout();
+initLocker();

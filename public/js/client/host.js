@@ -9,7 +9,7 @@ const MAX_STEPS_PER_FRAME = 5;
 export class LocalHost {
   constructor(opts = {}) {
     this.match = new Match({ botCount: opts.botCount, seed: opts.seed });
-    this.local = this.match.addHuman('You');
+    this.local = this.match.addHuman(opts.name || 'You', opts.loadout);
     this.match.addBots();
     this.acc = 0;
   }

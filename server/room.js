@@ -6,7 +6,6 @@ import { performance } from 'node:perf_hooks';
 import { TICK_RATE, TICK_DT } from '../shared/config.js';
 import { Match } from '../shared/sim/match.js';
 import { emptyCommand } from '../shared/sim/controller.js';
-import { OUTFITS } from '../shared/cosmetics/outfits.js';
 import { encodeSnapshot, recordBytes, sameBytes } from '../shared/net/protocol.js';
 import { serializeEvent, buildWelcome } from '../shared/net/wire.js';
 import { recordMatch } from './results.js';
@@ -81,8 +80,8 @@ export class Room {
     const humans = this.humans.filter((c) => c.connected);
     const match = new Match({ keepHistory: true });
     this.match = match;
-    humans.forEach((c, i) => {
-      c.fighter = match.addHuman(c.name, OUTFITS[i % OUTFITS.length]);
+    humans.forEach((c) => {
+      c.fighter = match.addHuman(c.name, c.loadout || undefined);
       c.known = new Map();
       c.lastSeq = 0;
       c.queue = [];

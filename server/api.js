@@ -95,6 +95,12 @@ export function createApi({ db, accounts }) {
         case 'POST /api/logout':
           await accounts.logout(token);
           return json(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader(req, '', 0) });
+        case 'POST /api/loadout': {
+          const u = await accounts.userForToken(token);
+          if (!u) throw new AccountError('Sign in to save your locker', 401);
+          const b = await readBody(req, 4096);
+          return json(res, 200, { loadout: await accounts.saveLoadout(u.id, b.loadout) });
+        }
         case 'GET /api/me': {
           const u = await accounts.userForToken(token);
           if (!u) return json(res, 200, { guest: true });

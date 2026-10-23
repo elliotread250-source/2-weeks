@@ -80,7 +80,7 @@ export function buildWelcome(match, selfId) {
     seed: match.seed,
     self: selfId,
     tick: match.tickCount,
-    fighters: match.fighters.map((f) => ({ id: f.id, name: f.name, outfit: f.outfit, human: f.human })),
+    fighters: match.fighters.map((f) => ({ id: f.id, name: f.name, loadout: f.loadout, human: f.human })),
     builds: match.builds.list.map(pieceToWire),
     pickups: match.loot.pickups.map(pickupToWire),
     chestsOpen: match.loot.chests.filter((c) => c.opened).map((c) => c.id),

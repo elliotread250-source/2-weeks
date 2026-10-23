@@ -20,6 +20,9 @@ import { label } from './binds.js';
 import { LocalHost } from './host.js';
 import { InputController } from './input.js';
 import { CameraRig } from './camera.js';
+import { ContrailSystem } from '../render/cosmetics.js';
+import { item as cosmetic } from '/shared/cosmetics/catalog.js';
+import { showWheel } from '../ui/wheel.js';
 
 function makeSky() {
   const geo = new THREE.SphereGeometry(1500, 24, 12);
@@ -119,7 +122,7 @@ export class Game {
     this.sun = sun;
 
     // The match runs in this tab; the client only sees `match` as read-only state.
-    this.host = opts.host || new LocalHost({ botCount: opts.botCount });
+    this.host = opts.host || new LocalHost({ botCount: opts.botCount, name: opts.name, loadout: opts.loadout });
     this.match = this.host.match;
     this.player = this.host.local;
 
@@ -148,8 +151,11 @@ export class Game {
       rebinding: () => this.rebinding,
       localFighter: () => this.player,
       onLockChange: (locked) => this.onLockChange(locked),
+      emoteSlots: () => (opts.loadout?.emotes || []).map((id) => (id && cosmetic(id) ? cosmetic(id).clip : 0)),
+      onWheel: (w) => showWheel(w, opts.loadout?.emotes || []),
     });
     this.cameraRig = new CameraRig(this.camera);
+    this.contrails = new ContrailSystem(scene);
     this.clock = new THREE.Clock();
     this.loop = this.loop.bind(this);
     this.dispatch(this.match.takeEvents()); // initial loot and chests
@@ -224,6 +230,13 @@ export class Game {
     this.updateBusMesh();
     this.updateRockets();
     this.updatePlayerOverlays();
+    for (const f of m.fighters) {
+      if (f.alive && !f.hidden && f.airborne && f.loadout && f.loadout.contrail) {
+        const c = cosmetic(f.loadout.contrail);
+        if (c) this.contrails.emit(f.id, f.pos, c.spec, dt);
+      }
+    }
+    this.contrails.update(dt);
     this.stormView.sync(m.storm);
     this.buildView.update(dt);
     this.lootView.update(dt, this.time, p.alive ? p.pos : this.camera.position);

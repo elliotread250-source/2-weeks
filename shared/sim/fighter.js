@@ -15,11 +15,12 @@ const CAM = {
 };
 
 export class Fighter {
-  constructor(name, outfit, { human = false } = {}) {
+  constructor(name, outfit, { human = false, loadout = null } = {}) {
     this.id = fighterId++;
     this.name = name;
     this.human = human; // driven by input commands (a bot is driven by its brain)
-    this.outfit = outfit;
+    this.outfit = outfit; // resolved recipe (palette + parts)
+    this.loadout = loadout; // cosmetic ids: pickaxe, glider, contrail, wrap, emotes...
     this.pos = new Vec3();
     this.vel = new Vec3();
     this.prev = { x: 0, y: 0, z: 0, yaw: 0 }; // last tick, for render interpolation
