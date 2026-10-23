@@ -75,6 +75,9 @@ export class Combat {
     for (const f of this.m.fighters) {
       if (!f.alive) continue;
       f.fireCd = Math.max(0, f.fireCd - dt);
+      f.fireFx = Math.max(0, f.fireFx - dt);
+      f.hitFx = Math.max(0, f.hitFx - dt);
+      f.placeFx = Math.max(0, f.placeFx - dt);
       f.swingT = Math.max(0, f.swingT - dt);
       if (f.pendingSwing) {
         f.pendingSwing.t -= dt;
@@ -113,6 +116,8 @@ export class Combat {
       return false;
     }
     f.heal = null;
+    f.emote = 0;
+    f.fireFx = 0.18;
     w.mag -= 1;
     f.fireCd = 1 / spec.fireRate;
     const moving = Math.hypot(f.vel.x, f.vel.z) > 1;
@@ -238,6 +243,7 @@ export class Combat {
     f.fireCd = PICKAXE.cooldown;
     f.swingT = 0.42;
     f.heal = null;
+    f.emote = 0;
     f.pendingSwing = { t: 0.17, origin: origin.clone(), dir: dir.clone() };
     this.sfx('swing', f.pos, f.id);
     return true;
@@ -346,6 +352,13 @@ export class Combat {
     target.shield -= toShield;
     target.hp -= toHealth;
     target.flash = 0.15;
+    if (!opts.storm && source && source !== target) {
+      // Angle the hit came from, relative to where the target faces (for the hit-react clip).
+      const a = Math.atan2(-(source.pos.x - target.pos.x), -(source.pos.z - target.pos.z)) - target.yaw;
+      target.hitDir = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      target.hitFx = 0.3;
+      target.hitHead = !!opts.head;
+    }
     if (source && source !== target) {
       target.lastHitBy = { f: source, t: this.m.time };
       if (!opts.storm) source.damageDealt += toShield + toHealth;

@@ -30,6 +30,8 @@ export const PLAYER = {
   sprintSpeed: 7.4,
   adsSpeed: 3.4,
   healSpeed: 2.8,
+  crouchSpeed: 3.0,
+  crouchHeight: 1.35, // hit volume height while crouched
   swimSpeed: 3.2,
   jumpVel: 8.6,
   gravity: 24,
@@ -156,5 +158,8 @@ export const FALLOFF = {
   smg: { start: 25, span: 80, min: 0.6 },
   pistol: { start: 25, span: 80, min: 0.6 },
 };
+
+export const EMOTE_COUNT = 25;
+export const EMOTE_COOLDOWN = 0.5;
 
 export const INTERACT = { chestHold: 0.5, chestRange: 2.4, pickupRange: 2.2 };

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 1 and 2 done (sim split from renderer; online netcode). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 to 4 done (sim split from renderer; online netcode; accounts; skinned characters). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -37,6 +37,20 @@ Anti-cheat (server): damage, ammo, fire rate, build range and cost are all compu
 Deviations from the master prompt: commands go out at the tick rate (30 Hz) rather than 60 Hz, because the server consumes exactly one per tick; edits are not predicted, only placement.
 
 Measured (this sandbox, one core): a 32-bot, 10 minute match averages 0.2 ms per tick (0.6% of the 33 ms budget, p99 1 ms, max 11 ms), 104 MB RSS. Prediction error with a 2% loss proxy at 50, 150 and 250 ms RTT: mean under 1 cm, max 2 cm, no snaps. Railway numbers still to measure.
+
+## Characters and animation (Phase 4)
+
+`render/rig.js` builds each character in code: 18 bones (hips, 3 spine, neck, head, arms, legs; Mixamo-compatible layout), about 40 rounded low-poly parts, vertex-coloured from the outfit palette and skinned (rigid parts plus smooth chains for the torso, knees and elbows), merged into one SkinnedMesh. Sockets sit on the hands, back and head. The face is a canvas decal with five expressions. About 18k vertices; characters beyond 40 m animate at half rate and past 150 m swap to a box stand-in.
+
+`render/anims/*` author 127 clips as pose functions baked to AnimationClips at 30 fps: locomotion, air and glider, swim, eight weapon classes (idle, move, ADS, fire, reload, equip each, with a different reload motion per class), pickaxe with three alternating swings, build and edit, five healing animations, hit reactions, knocked, revive, 25 emotes. Convention: +X rotation means forward on every bone.
+
+`render/animator.js` is the state machine. It reads only sim state (velocity, grounded, crouch, ADS, weapon, swing timer, heal, emote, flags carried in snapshots), so remote players animate with no extra data. Two layers on one mixer: legs and pelvis run locomotion, torso and arms run the activity. Fire recoil and hit reactions are additive overlays. Aim offset bends the spine and lifts the arms with camera pitch. Planted feet use two-bone IK onto the terrain for characters within 40 m. Skydiving tilts the body belly down.
+
+New sim state for this: crouch (held bit 128), emote command (1..25, cancelled by movement/firing/building), short fx timers (fire, hit, place) and hit direction, all carried in snapshot records. Camera: shoulder swap (G), sprint FOV, shake on explosions and heavy hits with a settings slider.
+
+`public/viewer.html` is a developer page that plays any clip on any default outfit; `tools/shots.mjs` renders poses to PNG. `render/glb.js` loads an authored Mixamo-skeleton .glb from `public/assets/characters/` and renames its bones to ours so every clip binds; rest-pose axis corrections (`RETARGET_FIX`) are the part still to do if a real asset is dropped in. Nothing depends on it.
+
+Caveats: crouch, emotes and the animator are verified by unit tests and software-rendered screenshots, not on a GPU. Knocked/revive clips exist but the sim has no downed state yet (Duos/Squads).
 
 ## Module map: where everything moves
 

@@ -138,7 +138,7 @@ export class Game {
 
     this.views = new Map();
     for (const f of this.match.fighters) {
-      const v = new FighterView(scene, f);
+      const v = new FighterView(scene, f, { groundAt: (x, z, y) => this.match.collision.groundHeight(x, z, y + 0.5, 0.05) });
       v.local = f === this.player;
       this.views.set(f.id, v);
     }
@@ -218,7 +218,7 @@ export class Game {
       y: p.prev.y + (p.pos.y - p.prev.y) * alpha + p.smooth.y,
       z: p.prev.z + (p.pos.z - p.prev.z) * alpha + p.smooth.z,
     };
-    for (const v of this.views.values()) v.update(dt, this.time, alpha);
+    for (const v of this.views.values()) v.update(dt, this.time, alpha, this.camera.position);
     this.cameraRig.update(p, lp, this.input.yaw, this.input.pitch, { match: m, spectate: this.spectate });
 
     this.updateBusMesh();
@@ -387,6 +387,7 @@ export class Game {
         case 'explosion':
           this.fx.explosion(ev.pos, ev.radius);
           sfx('explosion', this.distanceVolume(ev.pos, 200, 0.1));
+          this.cameraRig.shake(this.distanceVolume(ev.pos, 60, 0) * 1.2);
           break;
         case 'kick': if (ev.by === me) hud.kick(ev.k); break;
         case 'matGain': if (ev.by === me) hud.matGain(ev.mat, ev.n); break;
@@ -400,13 +401,13 @@ export class Game {
           }
           if (ev.target === me && !ev.storm) {
             hud.damageFlash(ev.from);
+            this.cameraRig.shake(Math.min(0.8, ev.amount / 80) + (ev.head ? 0.3 : 0));
             sfx('hurt', 0.6);
           }
           break;
         case 'eliminated': {
           const at = ev.pos;
-          this.fx.burst({ x: at.x, y: at.y + 1, z: at.z }, ev.color, 14, 6, 1.5);
-          this.fx.burst({ x: at.x, y: at.y + 1.2, z: at.z }, '#7fd0ff', 10, 5, 1);
+          this.fx.dissolve(at, [ev.color, '#7fd0ff', '#ffffff']);
           break;
         }
         case 'feed': hud.feed(ev.text, ev.target === me || ev.killer === me); break;

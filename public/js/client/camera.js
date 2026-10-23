@@ -3,6 +3,7 @@
 // it reads the sim but never changes it.
 import * as THREE from 'three';
 import { WEAPONS } from '/shared/config.js';
+import { settings } from './binds.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -12,6 +13,12 @@ export class CameraRig {
     this.pos = new THREE.Vector3();
     this.dir = new THREE.Vector3();
     this.camera.rotation.order = 'YXZ';
+    this.shakeAmp = 0;
+  }
+
+  // Kick the camera. amount ~0.3 for a hit, ~1 for a close explosion.
+  shake(amount) {
+    this.shakeAmp = Math.min(1.5, this.shakeAmp + amount);
   }
 
   // lp: interpolated position of the local fighter. busPos/spectate optional.
@@ -35,12 +42,13 @@ export class CameraRig {
       fov = f.state === 'skydive' ? 85 : 78;
     } else {
       pivot = lpv.clone().add(new THREE.Vector3(0, 1.65, 0));
-      dist = 3.4; shoulder = 0.75;
+      dist = 3.4; shoulder = 0.75 * f.shoulder;
       if (f.ads) {
-        dist = 1.9; shoulder = 0.62;
+        dist = 1.9; shoulder = 0.62 * f.shoulder;
         fov = 75 / WEAPONS[f.weapon.type].zoom;
       }
       if (f.buildMode || f.editMode) dist = 3.8;
+      if (!f.ads && f.onGround && Math.hypot(f.vel.x, f.vel.z) > 6.6) fov += 8; // sprint
     }
 
     const cp = Math.cos(pitch), sp = Math.sin(pitch);
@@ -61,6 +69,13 @@ export class CameraRig {
       if (hit) desired.copy(start).addScaledVector(toCam, Math.max(0.3, hit.t - 0.25));
       cam.position.copy(desired);
     }
+    const amp = this.shakeAmp * (settings.shake ?? 1);
+    if (amp > 0.002) {
+      cam.position.x += (Math.random() - 0.5) * 0.12 * amp;
+      cam.position.y += (Math.random() - 0.5) * 0.12 * amp;
+      cam.position.z += (Math.random() - 0.5) * 0.12 * amp;
+    }
+    this.shakeAmp *= 0.88;
     cam.rotation.set(pitch, yaw, 0);
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov += (fov - cam.fov) * 0.35;

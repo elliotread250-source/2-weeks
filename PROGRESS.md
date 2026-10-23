@@ -59,7 +59,21 @@ Not done / to check:
 - The end-of-match "make an account to keep your coins" prompt arrives with coins in Phase 6.
 - No password-upgrade path yet (brief calls it optional).
 
-## Next: Phase 4 (characters, rig and animation)
+## Phase 4: characters, rig and animation (done 2026-10-23)
+
+Done:
+- Skinned 18-bone characters built in code (rig.js), 127 baked clips (anims/), animator state machine with upper/lower layers, additive recoil and hit reactions, aim offset, foot IK, skydive tilt, LOD, canvas faces with expressions, voxel elimination effect.
+- Sim: crouch, emotes (25), hit/fire/place timers, shoulder swap. Protocol records carry the animation flags.
+- Camera shake, sprint FOV, shoulder swap. Bind keys: crouch Ctrl, emote B (cycles through all 25 until the locker wheel exists), swap shoulder G.
+- Viewer page and screenshot tool; glb retarget scaffolding.
+- Tests: 72 total (clips, loops, bones, rig weights, state machine, IK, flags).
+
+Not done / to check:
+- Knocked/DBNO clips exist; the sim has no downed state yet (Duos and Squads, later).
+- Visual polish was judged from software renders only. Gun models are still the old boxes (Phase 7).
+- 18k vertices per character is on the heavy side; revisit with the quality presets in Phase 10.
+
+## Next: Phase 5 (cosmetics, locker, skin customisation)
 
 Not started.
 

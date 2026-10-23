@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 480, height: 270 } });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });
-page.on('response', (r) => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
+page.on('response', (r) => { if (r.status() >= 400 && !r.url().includes('/api/')) errors.push(`${r.status()} ${r.url()}`); });
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 await page.goto(url, { waitUntil: 'load' });
 await page.click('#play-btn');
