@@ -1,9 +1,10 @@
 // DOM HUD: health/shield bars, hotbar, mats, minimap, storm timer, kill feed.
-import { WEAPONS, CONSUMABLES, RARITIES, PLAYER } from './config.js';
-import { TERRAIN_SIZE, paintMinimap, POIS, poiAt } from './terrain.js';
-import { formatTime } from './util.js';
+import { WEAPONS, CONSUMABLES, PLAYER } from '/shared/config.js';
+import { TERRAIN_SIZE, POIS, poiAt } from '/shared/sim/terrain.js';
+import { paintMinimap } from '../render/terrain.js';
+import { formatTime } from '/shared/math/util.js';
 import { iconSVG } from './icons.js';
-import { label, settings } from './binds.js';
+import { label, settings } from '../client/binds.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -178,7 +179,7 @@ export class HUD {
   update(dt, game) {
     const p = game.player;
     this.playerRef = p;
-    this.camYaw = game.controller.camYaw;
+    this.camYaw = game.input.yaw;
 
     if (this.msgT > 0) {
       this.msgT -= dt;
@@ -197,36 +198,36 @@ export class HUD {
     this.set('sht', this.shieldText, String(sh));
 
     // Crosshair spread.
-    const c = game.controller;
+    const c = game.input;
     this.kickV = Math.max(0, this.kickV - dt * 6);
     let gap = 6;
     const w = p.weapon;
     if (w) {
       const spec = WEAPONS[w.type];
       const moving = Math.hypot(p.vel.x, p.vel.z) > 1;
-      let s = c.ads ? spec.adsSpread : spec.spread;
+      let s = p.ads ? spec.adsSpread : spec.spread;
       if (spec.pellets === 1) s += p.bloom + (moving ? 0.015 : 0) + (p.onGround ? 0 : 0.035);
       gap = 4 + s * 500 + this.kickV * 6;
     }
     gap = Math.round(gap);
     // Each weapon type gets its own reticle shape; the gap tracks spread.
     let kind = w ? w.type : (p.selected === 0 ? 'pickaxe' : 'item');
-    if (c.buildMode || c.editMode) kind = 'build';
+    if (p.buildMode || p.editMode) kind = 'build';
     const rk = `${kind}:${gap}`;
     if (this.cache.reticle !== rk) {
       this.cache.reticle = rk;
       this.crosshair.innerHTML = reticleSVG(kind, gap);
     }
-    this.set('scope', this.scope, c.scoped ? 'on' : '', 'className');
-    this.crosshair.style.display = c.scoped || p.state !== 'ground' || !p.alive ? 'none' : 'block';
+    this.set('scope', this.scope, p.scoped ? 'on' : '', 'className');
+    this.crosshair.style.display = p.scoped || p.state !== 'ground' || !p.alive ? 'none' : 'block';
 
     // Hotbar.
-    const sig = JSON.stringify([p.selected, c.buildMode, p.slots.map((s) => s && [s.type, s.rarity, s.count, s.mag])]);
+    const sig = JSON.stringify([p.selected, p.buildMode, p.slots.map((s) => s && [s.type, s.rarity, s.count, s.mag])]);
     if (this.cache.hot !== sig) {
       this.cache.hot = sig;
-      let html = `<div class="slot pick ${p.selected === 0 && !c.buildMode ? 'sel' : ''}"><span class="num">1</span>${iconSVG('pickaxe')}</div>`;
+      let html = `<div class="slot pick ${p.selected === 0 && !p.buildMode ? 'sel' : ''}"><span class="num">1</span>${iconSVG('pickaxe')}</div>`;
       p.slots.forEach((s, i) => {
-        const sel = p.selected === i + 1 && !c.buildMode ? 'sel' : '';
+        const sel = p.selected === i + 1 && !p.buildMode ? 'sel' : '';
         if (!s) { html += `<div class="slot ${sel}"><span class="num">${i + 2}</span></div>`; return; }
         if (s.kind === 'weapon') {
           html += `<div class="slot r${s.rarity} ${sel}" title="${WEAPONS[s.type].name}"><span class="num">${i + 2}</span>${iconSVG(s.type)}<span class="cnt">${s.mag}</span></div>`;
@@ -240,21 +241,21 @@ export class HUD {
 
     // Ammo readout.
     let ammoText = '';
-    if (c.buildMode) ammoText = '';
+    if (p.buildMode) ammoText = '';
     else if (w) ammoText = `${w.mag} <small>/ ${p.ammo[WEAPONS[w.type].ammo]}</small>`;
     this.set('ammo', this.ammo, ammoText, 'innerHTML');
 
     // Materials.
     for (const m of ['wood', 'brick', 'metal']) {
       this.set(`m${m}`, this.matEls[m].querySelector('b'), String(p.mats[m]));
-      this.set(`ms${m}`, this.matEls[m], `mat ${c.buildMode && c.buildMat === m ? 'sel' : ''}`, 'className');
+      this.set(`ms${m}`, this.matEls[m], `mat ${p.buildMode && p.buildMat === m ? 'sel' : ''}`, 'className');
     }
-    this.set('building', this.root, c.buildMode ? 'building' : '', 'className');
+    this.set('building', this.root, p.buildMode ? 'building' : '', 'className');
     for (const [k, el] of Object.entries(this.pieceEls)) {
       this.set(`pk${k}`, el.querySelector('b'), label(k));
-      this.set(`pc${k}`, el, `piece ${c.buildPiece === k ? 'sel' : ''}`, 'className');
+      this.set(`pc${k}`, el, `piece ${p.buildPiece === k ? 'sel' : ''}`, 'className');
     }
-    this.set('mode', this.modeTag, c.editMode ? (settings.confirmEditOnRelease ? `EDIT: HOLD ${label('fire')} OVER TILES, LET GO TO CONFIRM` : `EDIT: ${label('edit')} TO CONFIRM`) : c.buildMode ? `BUILD: ${c.buildMat.toUpperCase()}` : '');
+    this.set('mode', this.modeTag, p.editMode ? (settings.confirmEditOnRelease ? `EDIT: HOLD ${label('fire')} OVER TILES, LET GO TO CONFIRM` : `EDIT: ${label('edit')} TO CONFIRM`) : p.buildMode ? `BUILD: ${p.buildMat.toUpperCase()}` : '');
 
     // Counters.
     this.set('alive', this.alive, String(game.aliveCount()));
@@ -362,7 +363,7 @@ export class HUD {
 
     // Player arrow.
     const [px, pz] = toS(p.pos.x, p.pos.z);
-    const yaw = game.controller.camYaw;
+    const yaw = game.input.yaw;
     ctx.save();
     ctx.translate(px, pz);
     ctx.rotate(-yaw);

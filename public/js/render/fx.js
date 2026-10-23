@@ -3,6 +3,8 @@
 import * as THREE from 'three';
 import { glowTexture } from './textures.js';
 
+const V = (p) => new THREE.Vector3(p.x, p.y, p.z);
+
 export class FX {
   constructor(scene, camera, container) {
     this.scene = scene;
@@ -29,7 +31,7 @@ export class FX {
   }
 
   tracer(from, to, color = null) {
-    const g = new THREE.BufferGeometry().setFromPoints([from.clone(), to.clone()]);
+    const g = new THREE.BufferGeometry().setFromPoints([V(from), V(to)]);
     const m = color ? new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 }) : this.tracerMat.clone();
     const line = new THREE.Line(g, m);
     this.scene.add(line);
@@ -38,7 +40,7 @@ export class FX {
 
   muzzle(pos) {
     const s = new THREE.Sprite(this.flashMat);
-    s.position.copy(pos);
+    s.position.set(pos.x, pos.y, pos.z);
     s.scale.set(0.7, 0.7, 1);
     this.scene.add(s);
     this.flashes.push({ s, life: 0.05, max: 0.05, grow: 0 });
@@ -60,7 +62,7 @@ export class FX {
 
   explosion(pos, radius) {
     const s = new THREE.Sprite(this.boomMat);
-    s.position.copy(pos);
+    s.position.set(pos.x, pos.y, pos.z);
     s.scale.set(radius, radius, 1);
     this.scene.add(s);
     this.flashes.push({ s, life: 0.45, max: 0.45, grow: radius * 3 });
@@ -118,7 +120,7 @@ export class FX {
     el.textContent = Math.round(amount);
     this.container.appendChild(el);
     this.numbers.push({
-      el, pos: worldPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6)),
+      el, pos: V(worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6)),
       life: 0.9, rise: 0,
     });
   }

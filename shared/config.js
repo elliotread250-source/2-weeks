@@ -1,6 +1,15 @@
 // Every tunable number in the game lives here. Values are taken from Fortnite
 // Battle Royale where a direct equivalent exists, then scaled for a small
-// Rebirth Island style map and a ~12 minute match.
+// Rebirth Island style map and a ~12 minute match. Player-facing strings are
+// in names.js.
+import {
+  WEAPON_NAMES, WEAPON_SHORT, CONSUMABLE_NAMES, CONSUMABLE_SHORT, AMMO_NAMES, MATERIAL_NAMES,
+  PICKAXE_NAME, RARITY_NAMES,
+} from './names.js';
+
+// Simulation rate. The renderer interpolates between ticks.
+export const TICK_RATE = 30;
+export const TICK_DT = 1 / TICK_RATE;
 
 // Build grid. Fortnite tiles are 512uu wide x 384uu tall (5.12m x 3.84m).
 export const TILE = 5;
@@ -35,48 +44,48 @@ export const PLAYER = {
 };
 
 export const RARITIES = [
-  { id: 0, name: 'Common', color: '#b4b4b4', dark: '#6d6d6d' },
-  { id: 1, name: 'Uncommon', color: '#69bb2d', dark: '#2f6d12' },
-  { id: 2, name: 'Rare', color: '#3fa6f2', dark: '#1a5c9c' },
-  { id: 3, name: 'Epic', color: '#b84fe8', dark: '#622089' },
-  { id: 4, name: 'Legendary', color: '#f39a32', dark: '#9a4b0c' },
+  { id: 0, name: RARITY_NAMES[0], color: '#b4b4b4', dark: '#6d6d6d' },
+  { id: 1, name: RARITY_NAMES[1], color: '#69bb2d', dark: '#2f6d12' },
+  { id: 2, name: RARITY_NAMES[2], color: '#3fa6f2', dark: '#1a5c9c' },
+  { id: 3, name: RARITY_NAMES[3], color: '#b84fe8', dark: '#622089' },
+  { id: 4, name: RARITY_NAMES[4], color: '#f39a32', dark: '#9a4b0c' },
 ];
 
 // Per-rarity arrays are [common, uncommon, rare, epic, legendary]. A null
 // damage entry means the weapon never rolls at that rarity.
 export const WEAPONS = {
   ar: {
-    name: 'Assault Rifle', short: 'AR', ammo: 'medium', auto: true,
+    name: WEAPON_NAMES.ar, short: WEAPON_SHORT.ar, ammo: 'medium', auto: true,
     damage: [30, 31, 33, 35, 36], fireRate: 5.5, mag: 30,
     reload: [2.7, 2.6, 2.5, 2.4, 2.3], spread: 0.022, adsSpread: 0.008, bloom: 0.006,
     headMult: 1.5, range: 160, structureMult: 1, pellets: 1, zoom: 1.6,
   },
   pump: {
-    name: 'Pump Shotgun', short: 'PUMP', ammo: 'shells', auto: false,
+    name: WEAPON_NAMES.pump, short: WEAPON_SHORT.pump, ammo: 'shells', auto: false,
     damage: [80, 85, 90, 95, 100], fireRate: 0.75, mag: 5,
     reload: [5.0, 4.8, 4.6, 4.4, 4.2], spread: 0.085, adsSpread: 0.07, bloom: 0,
     headMult: 2.0, range: 45, structureMult: 1, pellets: 10, zoom: 1.2,
   },
   smg: {
-    name: 'Submachine Gun', short: 'SMG', ammo: 'light', auto: true,
+    name: WEAPON_NAMES.smg, short: WEAPON_SHORT.smg, ammo: 'light', auto: true,
     damage: [16, 17, 18, 19, 20], fireRate: 11, mag: 30,
     reload: [2.3, 2.2, 2.1, 2.0, 1.9], spread: 0.035, adsSpread: 0.022, bloom: 0.004,
     headMult: 1.75, range: 90, structureMult: 1, pellets: 1, zoom: 1.3,
   },
   pistol: {
-    name: 'Pistol', short: 'PISTOL', ammo: 'light', auto: false,
+    name: WEAPON_NAMES.pistol, short: WEAPON_SHORT.pistol, ammo: 'light', auto: false,
     damage: [24, 25, 26, 27, 28], fireRate: 6.75, mag: 16,
     reload: [1.5, 1.45, 1.4, 1.35, 1.3], spread: 0.02, adsSpread: 0.01, bloom: 0.01,
     headMult: 2.0, range: 90, structureMult: 1, pellets: 1, zoom: 1.3,
   },
   sniper: {
-    name: 'Bolt-Action Sniper', short: 'SNIPER', ammo: 'heavy', auto: false,
+    name: WEAPON_NAMES.sniper, short: WEAPON_SHORT.sniper, ammo: 'heavy', auto: false,
     damage: [null, null, 105, 110, 116], fireRate: 0.33, mag: 1,
     reload: [3.2, 3.2, 3.0, 2.9, 2.8], spread: 0.12, adsSpread: 0.0, bloom: 0,
     headMult: 2.5, range: 450, structureMult: 0.6, pellets: 1, zoom: 5, scope: true,
   },
   rocket: {
-    name: 'Rocket Launcher', short: 'ROCKET', ammo: 'rockets', auto: false,
+    name: WEAPON_NAMES.rocket, short: WEAPON_SHORT.rocket, ammo: 'rockets', auto: false,
     damage: [null, null, null, 110, 121], fireRate: 0.75, mag: 1,
     reload: [3.6, 3.6, 3.6, 3.4, 3.2], spread: 0.01, adsSpread: 0.005, bloom: 0,
     headMult: 1, range: 300, structureMult: 4, pellets: 1, zoom: 1.4,
@@ -86,31 +95,31 @@ export const WEAPONS = {
 
 // Pickaxe: 20 to players like Fortnite, 50 to builds, 100 on a weak point.
 export const PICKAXE = {
-  name: 'Default Pickaxe', short: 'PICK', playerDamage: 20, structureDamage: 50,
+  name: PICKAXE_NAME, short: 'PICK', playerDamage: 20, structureDamage: 50,
   harvestDamage: 50, cooldown: 0.5, range: 2.6,
 };
 
 export const CONSUMABLES = {
-  bandage: { name: 'Bandages', short: 'BAND', rarity: 0, stack: 15, time: 3.5, health: 15, healthCap: 75, pickup: 5 },
-  medkit: { name: 'Med Kit', short: 'MED', rarity: 1, stack: 3, time: 10, health: 100, healthCap: 100, pickup: 1 },
-  minis: { name: 'Small Shield Potion', short: 'MINI', rarity: 1, stack: 6, time: 2, shield: 25, shieldCap: 50, pickup: 3 },
-  bigpot: { name: 'Shield Potion', short: 'BIG POT', rarity: 2, stack: 3, time: 5, shield: 50, shieldCap: 100, pickup: 1 },
-  chug: { name: 'Chug Jug', short: 'CHUG', rarity: 4, stack: 1, time: 15, health: 100, healthCap: 100, shield: 100, shieldCap: 100, pickup: 1 },
+  bandage: { name: CONSUMABLE_NAMES.bandage, short: CONSUMABLE_SHORT.bandage, rarity: 0, stack: 15, time: 3.5, health: 15, healthCap: 75, pickup: 5 },
+  medkit: { name: CONSUMABLE_NAMES.medkit, short: CONSUMABLE_SHORT.medkit, rarity: 1, stack: 3, time: 10, health: 100, healthCap: 100, pickup: 1 },
+  minis: { name: CONSUMABLE_NAMES.minis, short: CONSUMABLE_SHORT.minis, rarity: 1, stack: 6, time: 2, shield: 25, shieldCap: 50, pickup: 3 },
+  bigpot: { name: CONSUMABLE_NAMES.bigpot, short: CONSUMABLE_SHORT.bigpot, rarity: 2, stack: 3, time: 5, shield: 50, shieldCap: 100, pickup: 1 },
+  chug: { name: CONSUMABLE_NAMES.chug, short: CONSUMABLE_SHORT.chug, rarity: 4, stack: 1, time: 15, health: 100, healthCap: 100, shield: 100, shieldCap: 100, pickup: 1 },
 };
 
 export const AMMO = {
-  light: { name: 'Light Bullets', drop: 18, max: 999, color: '#d9d9d9' },
-  medium: { name: 'Medium Bullets', drop: 20, max: 999, color: '#8fd16a' },
-  heavy: { name: 'Heavy Bullets', drop: 6, max: 999, color: '#3e7fd9' },
-  shells: { name: 'Shells', drop: 6, max: 999, color: '#e0663f' },
-  rockets: { name: 'Rockets', drop: 3, max: 99, color: '#7a5a3a' },
+  light: { name: AMMO_NAMES.light, drop: 18, max: 999, color: '#d9d9d9' },
+  medium: { name: AMMO_NAMES.medium, drop: 20, max: 999, color: '#8fd16a' },
+  heavy: { name: AMMO_NAMES.heavy, drop: 6, max: 999, color: '#3e7fd9' },
+  shells: { name: AMMO_NAMES.shells, drop: 6, max: 999, color: '#e0663f' },
+  rockets: { name: AMMO_NAMES.rockets, drop: 3, max: 99, color: '#7a5a3a' },
 };
 
 // Wall vs floor/ramp/cone health from the Fortnite wiki: [start, max, seconds].
 export const MATERIALS = {
-  wood: { name: 'Wood', wall: [90, 150], other: [84, 140], time: 4 },
-  brick: { name: 'Brick', wall: [90, 300], other: [93, 280], time: 11.5 },
-  metal: { name: 'Metal', wall: [110, 500], other: [101, 460], time: 24.5 },
+  wood: { name: MATERIAL_NAMES.wood, wall: [90, 150], other: [84, 140], time: 4 },
+  brick: { name: MATERIAL_NAMES.brick, wall: [90, 300], other: [93, 280], time: 11.5 },
+  metal: { name: MATERIAL_NAMES.metal, wall: [110, 500], other: [101, 460], time: 24.5 },
 };
 export const MAT_ORDER = ['wood', 'brick', 'metal'];
 
@@ -136,3 +145,16 @@ export const LOOT_WEIGHTS = {
   floor: [40, 30, 18, 9, 3],
   chest: [10, 30, 32, 20, 8],
 };
+
+// Determinism: the same seeds give byte-identical map data on server and client.
+export const MAP_SEED = 20200421;
+export const DECOR_SEED = 777;
+
+// Damage falloff and headshot tuning that used to live inline in combat.
+export const FALLOFF = {
+  pump: { start: 7, span: 25, min: 0.25 },
+  smg: { start: 25, span: 80, min: 0.6 },
+  pistol: { start: 25, span: 80, min: 0.6 },
+};
+
+export const INTERACT = { chestHold: 0.5, chestRange: 2.4, pickupRange: 2.2 };

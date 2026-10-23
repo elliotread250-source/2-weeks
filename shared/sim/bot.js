@@ -1,15 +1,17 @@
 // Bot brains. Bots drop from the bus, loot, farm, fight, build cover when
-// they get shot, heal up and run from the storm.
-import * as THREE from 'three';
-import { PLAYER, WEAPONS, BUILD_COST, MAT_ORDER } from './config.js';
-import { POIS, terrainHeight } from './terrain.js';
-import { rand, pick, angleDiff, clamp } from './util.js';
+// they get shot, heal up and run from the storm. They write straight onto their
+// fighter and use the same combat and build rules as humans.
+import { PLAYER, WEAPONS, BUILD_COST, MAT_ORDER } from '../config.js';
+import { POIS } from './terrain.js';
+import { clamp } from '../math/util.js';
+import { Vec3, Vec2 } from '../math/vec3.js';
 
 const PREFERRED_RANGE = { pump: 5, smg: 12, pistol: 16, ar: 26, sniper: 70, rocket: 30 };
 
 export class BotBrain {
-  constructor(game, fighter, skill) {
-    this.game = game;
+  constructor(match, fighter, skill) {
+    this.m = match;
+    this.rng = match.rng;
     this.f = fighter;
     this.skill = skill; // 0..1
     fighter.brain = this;
@@ -17,12 +19,12 @@ export class BotBrain {
   }
 
   resetForDrop() {
-    const poi = Math.random() < 0.85 ? pick(POIS) : null;
+    const poi = this.rng.random() < 0.85 ? this.rng.pick(POIS) : null;
     this.dropTarget = poi
-      ? new THREE.Vector2(poi.x + rand(-poi.pad, poi.pad) * 0.6, poi.z + rand(-poi.pad, poi.pad) * 0.6)
-      : new THREE.Vector2(rand(-150, 150), rand(-140, 140));
-    this.jumpDelay = rand(0, 1);
-    this.think = rand(0, 0.3);
+      ? new Vec2(poi.x + this.rng.range(-poi.pad, poi.pad) * 0.6, poi.z + this.rng.range(-poi.pad, poi.pad) * 0.6)
+      : new Vec2(this.rng.range(-150, 150), this.rng.range(-140, 140));
+    this.jumpDelay = this.rng.range(0, 1);
+    this.think = this.rng.range(0, 0.3);
     this.goal = null;
     this.goalKind = '';
     this.target = null;
@@ -32,11 +34,11 @@ export class BotBrain {
     this.strafe = 1;
     this.strafeT = 0;
     this.stuckT = 0;
-    this.lastPos = new THREE.Vector3();
+    this.lastPos = new Vec3();
     this.lastPosT = 0;
     this.detour = null;
     this.buildCd = 0;
-    this.aimErr = new THREE.Vector2();
+    this.aimErr = new Vec2();
     this.attacker = null;
     this.harvestTarget = null;
   }
@@ -44,13 +46,13 @@ export class BotBrain {
   onDamaged(source) {
     if (!source || source === this.f) return;
     this.attacker = source;
-    this.attackedAt = this.game.time;
+    this.attackedAt = this.m.time;
     if (!this.target || this.target === source) {
       this.target = source;
       this.lastKnown = source.pos.clone();
     }
     // Fortnite reflex: throw up a wall (and sometimes a ramp) when shot.
-    if (this.buildCd <= 0 && this.f.state === 'ground' && Math.random() < 0.55 + this.skill * 0.3) {
+    if (this.buildCd <= 0 && this.f.state === 'ground' && this.rng.random() < 0.55 + this.skill * 0.3) {
       this.buildCover(source);
     }
   }
@@ -65,8 +67,8 @@ export class BotBrain {
     const mat = this.matToUse();
     if (!mat) return;
     const yaw = Math.atan2(-(threat.pos.x - f.pos.x), -(threat.pos.z - f.pos.z));
-    const builds = this.game.builds;
-    const pieces = Math.random() < 0.4 ? ['wall', 'ramp'] : ['wall'];
+    const builds = this.m.builds;
+    const pieces = this.rng.random() < 0.4 ? ['wall', 'ramp'] : ['wall'];
     for (const type of pieces) {
       const m2 = this.matToUse();
       if (!m2) break;
@@ -74,7 +76,7 @@ export class BotBrain {
       const p = builds.place(t, m2, f);
       if (p) f.mats[m2] -= BUILD_COST;
     }
-    this.buildCd = rand(2.5, 5);
+    this.buildCd = this.rng.range(2.5, 5);
   }
 
   bestWeaponFor(dist) {
@@ -96,17 +98,17 @@ export class BotBrain {
   }
 
   eye(f) {
-    return f.pos.clone().add(new THREE.Vector3(0, 1.6, 0));
+    return f.pos.clone().add(new Vec3(0, 1.6, 0));
   }
 
   findTarget() {
     const f = this.f;
     let best = null, bd = 75 + this.skill * 30;
-    for (const o of this.game.fighters) {
+    for (const o of this.m.fighters) {
       if (o === f || !o.alive || o.state === 'bus') continue;
       const d = o.pos.distanceTo(f.pos);
       if (d > bd) continue;
-      if (!this.game.collision.lineOfSight(this.eye(f), o.pos.clone().add(new THREE.Vector3(0, 1.3, 0)))) continue;
+      if (!this.m.collision.lineOfSight(this.eye(f), o.pos.clone().add(new Vec3(0, 1.3, 0)))) continue;
       bd = d;
       best = o;
     }
@@ -142,7 +144,7 @@ export class BotBrain {
 
   decide() {
     const f = this.f;
-    const g = this.game;
+    const g = this.m;
     const storm = g.storm;
 
     // Target acquisition.
@@ -161,9 +163,9 @@ export class BotBrain {
     const needRotate = storm.mode !== 'idle' && (inStorm || (storm.outsideNext(f.pos, 8) && (storm.mode === 'shrink' || storm.timer < 25)));
     if (needRotate) {
       const c = storm.mode === 'shrink' || inStorm ? storm.next.c : storm.next.c;
-      const ang = Math.atan2(f.pos.z - c.y, f.pos.x - c.x) + rand(-0.4, 0.4);
+      const ang = Math.atan2(f.pos.z - c.y, f.pos.x - c.x) + this.rng.range(-0.4, 0.4);
       const r = storm.next.r * 0.5;
-      this.goal = new THREE.Vector3(c.x + Math.cos(ang) * r, 0, c.y + Math.sin(ang) * r);
+      this.goal = new Vec3(c.x + Math.cos(ang) * r, 0, c.y + Math.sin(ang) * r);
       this.goalKind = 'storm';
       if (!this.target || inStorm) return;
     }
@@ -186,7 +188,7 @@ export class BotBrain {
     // Farm a little first if we already have a gun but no mats to build with.
     const totalMats = f.mats.wood + f.mats.brick + f.mats.metal;
     if (this.hasGun() && totalMats < 60 && !this.target && this.pickHarvest(18)) {
-      this.goal = new THREE.Vector3(this.harvestTarget.center.x, 0, this.harvestTarget.center.z);
+      this.goal = new Vec3(this.harvestTarget.center.x, 0, this.harvestTarget.center.z);
       this.goalKind = 'harvest';
       return;
     }
@@ -211,7 +213,7 @@ export class BotBrain {
     // Farm materials.
     if (totalMats < 150 && !this.target) {
       if (this.pickHarvest(30)) {
-        this.goal = new THREE.Vector3(this.harvestTarget.center.x, 0, this.harvestTarget.center.z);
+        this.goal = new Vec3(this.harvestTarget.center.x, 0, this.harvestTarget.center.z);
         this.goalKind = 'harvest';
         return;
       }
@@ -222,8 +224,8 @@ export class BotBrain {
       const c = storm.mode === 'idle' ? { x: 0, y: 0 } : storm.next.c;
       const r = storm.mode === 'idle' ? 160 : storm.next.r;
       const cand = POIS.filter((p) => Math.hypot(p.x - c.x, p.z - c.y) < r);
-      const p = cand.length ? pick(cand) : { x: c.x + rand(-r, r) * 0.5, z: c.y + rand(-r, r) * 0.5, pad: 6 };
-      this.goal = new THREE.Vector3(p.x + rand(-p.pad, p.pad) * 0.5, 0, p.z + rand(-p.pad, p.pad) * 0.5);
+      const p = cand.length ? this.rng.pick(cand) : { x: c.x + this.rng.range(-r, r) * 0.5, z: c.y + this.rng.range(-r, r) * 0.5, pad: 6 };
+      this.goal = new Vec3(p.x + this.rng.range(-p.pad, p.pad) * 0.5, 0, p.z + this.rng.range(-p.pad, p.pad) * 0.5);
       this.goalKind = 'wander';
     }
   }
@@ -235,7 +237,7 @@ export class BotBrain {
       if (Math.hypot(h.center.x - f.pos.x, h.center.z - f.pos.z) < range + 5) return h;
     }
     let best = null, bd = range;
-    for (const h of this.game.world.harvestables) {
+    for (const h of this.m.world.harvestables) {
       if (h.dead) continue;
       const d = Math.hypot(h.center.x - f.pos.x, h.center.z - f.pos.z);
       if (d < bd) { bd = d; best = h; }
@@ -246,14 +248,14 @@ export class BotBrain {
 
   act(dt) {
     const f = this.f;
-    const g = this.game;
+    const g = this.m;
     let move = null; // desired horizontal direction
     let speed = PLAYER.runSpeed;
     let wantJump = false;
 
     if (this.goalKind === 'fight' && this.target) {
       const tgt = this.target;
-      const toT = new THREE.Vector3().subVectors(tgt.pos, f.pos);
+      const toT = new Vec3().subVectors(tgt.pos, f.pos);
       const dist = Math.hypot(toT.x, toT.z);
       const wi = this.bestWeaponFor(dist);
       if (wi >= 0 && f.selected !== wi + 1) f.select(wi + 1);
@@ -262,15 +264,15 @@ export class BotBrain {
 
       // Strafe while closing to preferred range.
       this.strafeT -= dt;
-      if (this.strafeT <= 0) { this.strafe = Math.random() < 0.5 ? -1 : 1; this.strafeT = rand(0.6, 1.6); }
-      const fwd = new THREE.Vector3(toT.x / (dist || 1), 0, toT.z / (dist || 1));
-      const side = new THREE.Vector3(-fwd.z, 0, fwd.x).multiplyScalar(this.strafe);
+      if (this.strafeT <= 0) { this.strafe = this.rng.random() < 0.5 ? -1 : 1; this.strafeT = this.rng.range(0.6, 1.6); }
+      const fwd = new Vec3(toT.x / (dist || 1), 0, toT.z / (dist || 1));
+      const side = new Vec3(-fwd.z, 0, fwd.x).multiplyScalar(this.strafe);
       const approach = dist > pref * 1.3 ? 1 : dist < pref * 0.6 ? -0.6 : 0;
       move = fwd.multiplyScalar(approach).add(side.multiplyScalar(0.8));
-      if (Math.random() < dt * 0.4) wantJump = true;
+      if (this.rng.random() < dt * 0.4) wantJump = true;
 
       // Aim with human-ish error that tightens over time.
-      const aimPoint = tgt.pos.clone().add(new THREE.Vector3(0, Math.random() < 0.15 + this.skill * 0.15 ? 1.7 : 1.15, 0));
+      const aimPoint = tgt.pos.clone().add(new Vec3(0, this.rng.random() < 0.15 + this.skill * 0.15 ? 1.7 : 1.15, 0));
       const eye = this.eye(f);
       const dir = aimPoint.sub(eye).normalize();
       f.yaw = Math.atan2(-dir.x, -dir.z);
@@ -279,12 +281,12 @@ export class BotBrain {
       const visible = g.time - this.targetSeenAt < 0.6;
       if (w && this.reactT <= 0) {
         const err = (0.05 + (1 - this.skill) * 0.09) * (1 + dist / 60);
-        const d2 = dir.clone().add(new THREE.Vector3(rand(-err, err), rand(-err, err) * 0.6, rand(-err, err))).normalize();
+        const d2 = dir.clone().add(new Vec3(this.rng.range(-err, err), this.rng.range(-err, err) * 0.6, this.rng.range(-err, err))).normalize();
         const spec = WEAPONS[w.type];
         if (w.mag <= 0) g.combat.tryReload(f);
-        else if (dist < spec.range * 0.9 && (visible || Math.random() < 0.3)) {
+        else if (dist < spec.range * 0.9 && (visible || this.rng.random() < 0.3)) {
           // Bots don't hold triggers perfectly: semi-autos get a little delay.
-          if (spec.auto || Math.random() < dt * 8) g.combat.fire(f, eye, d2, { ads: dist > 20 });
+          if (spec.auto || this.rng.random() < dt * 8) g.combat.fire(f, eye, d2, { ads: dist > 20 });
         }
       } else if (!w) {
         // No usable gun: run at them with the pickaxe.
@@ -295,7 +297,7 @@ export class BotBrain {
     } else if (this.goal) {
       const dx = this.goal.x - f.pos.x, dz = this.goal.z - f.pos.z;
       const d = Math.hypot(dx, dz);
-      move = new THREE.Vector3(dx / (d || 1), 0, dz / (d || 1));
+      move = new Vec3(dx / (d || 1), 0, dz / (d || 1));
       if (this.goalKind !== 'heal') f.yaw = Math.atan2(-dx, -dz);
       if (this.goalKind === 'storm') speed = PLAYER.sprintSpeed;
 
@@ -312,7 +314,7 @@ export class BotBrain {
           move = null;
           if (f.selected !== 0) f.select(0);
           const eye = this.eye(f);
-          const dir = new THREE.Vector3(h.center.x - eye.x, h.center.y - eye.y, h.center.z - eye.z).normalize();
+          const dir = new Vec3(h.center.x - eye.x, h.center.y - eye.y, h.center.z - eye.z).normalize();
           f.pitch = Math.asin(clamp(dir.y, -1, 1));
           g.combat.swing(f, eye, dir);
         }
@@ -340,8 +342,8 @@ export class BotBrain {
         this.stuckT += this.lastPosT;
         wantJump = true;
         if (this.stuckT > 1.6) {
-          const a = Math.atan2(move.z, move.x) + (Math.random() < 0.5 ? 1.6 : -1.6);
-          this.detour = { dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), t: rand(0.8, 1.6) };
+          const a = Math.atan2(move.z, move.x) + (this.rng.random() < 0.5 ? 1.6 : -1.6);
+          this.detour = { dir: new Vec3(Math.cos(a), 0, Math.sin(a)), t: this.rng.range(0.8, 1.6) };
           if (this.stuckT > 3.2 && this.matToUse()) {
             const yaw = Math.atan2(-move.x, -move.z);
             const t = g.builds.computeTarget('ramp', f.pos, yaw, 0);

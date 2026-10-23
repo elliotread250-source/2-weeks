@@ -2,7 +2,7 @@
 // colliders (ramps and cones) that expose a height function. Everything the
 // game needs (walking, bullets, line of sight, camera) runs through here so
 // player builds, world buildings and harvestables all behave the same way.
-import { PLAYER, WATER_LEVEL, WORLD_HALF } from './config.js';
+import { PLAYER, WATER_LEVEL, WORLD_HALF } from '../config.js';
 
 const CELL = 8;
 let nextId = 1;

@@ -1,7 +1,7 @@
 // Entry point: lobby, settings/keybinds screen, then the match.
-import { Game } from './game.js';
-import { initAudio } from './audio.js';
-import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from './binds.js';
+import { Game } from '../client/game.js';
+import { initAudio } from '../audio/audio.js';
+import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from '../client/binds.js';
 
 const $ = (s) => document.querySelector(s);
 let game = null;
@@ -136,7 +136,7 @@ $('#play-btn').addEventListener('click', () => {
   }, 50);
 });
 
-$('#resume-btn').addEventListener('click', () => game && game.controller.lock());
+$('#resume-btn').addEventListener('click', () => game && game.input.lock());
 $('#quit-btn').addEventListener('click', () => location.reload());
 $('#again-btn').addEventListener('click', () => location.reload());
 

@@ -1,12 +1,19 @@
-// Tiny static server for Two Weeks. Serves /public and the three.js package
-// from node_modules so the game never depends on a third-party CDN.
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+// Tiny static server for Two Weeks. Serves /public, the shared simulation code
+// at /shared and the three.js package from node_modules at /vendor/three, so the
+// game never depends on a third-party CDN (school networks block them).
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
-const PUBLIC = path.join(__dirname, 'public');
-const THREE = path.join(__dirname, 'node_modules', 'three');
+
+const MOUNTS = [
+  { prefix: '/vendor/three/', dir: path.join(ROOT, 'node_modules', 'three'), cache: 'public, max-age=86400' },
+  { prefix: '/shared/', dir: path.join(ROOT, 'shared'), cache: 'no-cache' },
+];
+const PUBLIC = path.join(ROOT, 'public');
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -19,44 +26,50 @@ const TYPES = {
 };
 
 function resolve(urlPath) {
-  const clean = decodeURIComponent(urlPath.split('?')[0]);
+  let clean;
+  try { clean = decodeURIComponent(urlPath.split('?')[0]); } catch { return null; }
   let root = PUBLIC;
   let rel = clean;
-  if (clean.startsWith('/vendor/three/')) {
-    root = THREE;
-    rel = clean.slice('/vendor/three'.length);
+  let cache = 'no-cache';
+  for (const m of MOUNTS) {
+    if (clean.startsWith(m.prefix)) {
+      root = m.dir;
+      rel = clean.slice(m.prefix.length - 1);
+      cache = m.cache;
+    }
   }
   if (rel === '/' || rel === '') rel = '/index.html';
   const file = path.normalize(path.join(root, rel));
   if (!file.startsWith(root)) return null; // block path traversal
-  return file;
+  return { file, cache };
 }
 
-const server = http.createServer((req, res) => {
+export const server = http.createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('ok');
   }
-  const file = resolve(req.url);
-  if (!file) {
+  const hit = resolve(req.url);
+  if (!hit) {
     res.writeHead(403);
     return res.end('forbidden');
   }
-  fs.stat(file, (err, stat) => {
+  fs.stat(hit.file, (err, stat) => {
     if (err || !stat.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('not found');
     }
-    const type = TYPES[path.extname(file)] || 'application/octet-stream';
     res.writeHead(200, {
-      'Content-Type': type,
+      'Content-Type': TYPES[path.extname(hit.file)] || 'application/octet-stream',
       'Content-Length': stat.size,
-      'Cache-Control': file.startsWith(THREE) ? 'public, max-age=86400' : 'no-cache',
+      'Cache-Control': hit.cache,
     });
-    fs.createReadStream(file).pipe(res);
+    fs.createReadStream(hit.file).pipe(res);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Two Weeks running on http://localhost:${PORT}`);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  server.listen(PORT, () => {
+    console.log(`Two Weeks running on http://localhost:${PORT}`);
+  });
+}
