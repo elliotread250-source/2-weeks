@@ -14,6 +14,7 @@ export class FX {
     this.particles = [];
     this.numbers = [];
     this.debris = [];
+    this.voxels = [];
     this.unitBox = new THREE.BoxGeometry(1, 1, 1);
     this.groundFn = null;
     this.flashes = [];
@@ -113,6 +114,24 @@ export class FX {
     this.burst({ x: cx, y: min.y + 0.3, z: cz }, '#d8d2c4', 4, 3, 2.5);
   }
 
+  // Elimination: the body freezes into glowing voxels that drift up and fade.
+  dissolve(pos, colors) {
+    const mat = (c) => {
+      if (!this.glowMats) this.glowMats = new Map();
+      if (!this.glowMats.has(c)) this.glowMats.set(c, new THREE.MeshBasicMaterial({ color: new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.35) }));
+      return this.glowMats.get(c);
+    };
+    for (let i = 0; i < 44; i++) {
+      const c = colors[i % colors.length];
+      const m = new THREE.Mesh(this.unitBox, mat(c));
+      const s = 0.07 + Math.random() * 0.1;
+      m.scale.setScalar(s);
+      m.position.set(pos.x + (Math.random() - 0.5) * 0.7, pos.y + Math.random() * 1.9, pos.z + (Math.random() - 0.5) * 0.5);
+      this.scene.add(m);
+      this.voxels.push({ m, s, life: 1.5, vel: new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.8 + Math.random() * 1.6, (Math.random() - 0.5) * 0.8), spin: Math.random() * 3 });
+    }
+  }
+
   // Floating damage number. Blue = shield, white = health, yellow = headshot.
   damageNumber(worldPos, amount, kind) {
     const el = document.createElement('div');
@@ -186,6 +205,15 @@ export class FX {
         this.scene.remove(d.m);
         this.debris.splice(i, 1);
       }
+    }
+    for (let i = this.voxels.length - 1; i >= 0; i--) {
+      const v = this.voxels[i];
+      v.life -= dt;
+      v.m.position.addScaledVector(v.vel, dt);
+      v.m.rotation.x += v.spin * dt;
+      v.m.rotation.y += v.spin * dt * 0.7;
+      v.m.scale.setScalar(v.s * Math.max(0.01, Math.min(1, v.life / 0.6)));
+      if (v.life <= 0) { this.scene.remove(v.m); this.voxels.splice(i, 1); }
     }
     const w = window.innerWidth, h = window.innerHeight;
     for (let i = this.numbers.length - 1; i >= 0; i--) {

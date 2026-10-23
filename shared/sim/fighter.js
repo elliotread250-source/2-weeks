@@ -72,6 +72,16 @@ export class Fighter {
     this.dragAdd = false;
     this.editClicked = false;
     this.dive = false;
+    this.shoulder = 1; // camera side: +1 right shoulder, -1 left
+    this.crouch = false;
+    this.emote = 0; // 0 = none, 1..EMOTE_COUNT
+    this.emoteT = 0;
+    this.emoteCd = 0;
+    // Short timers the animator reads (they also ride in snapshots as flags).
+    this.fireFx = 0;
+    this.hitFx = 0;
+    this.hitDir = 0;
+    this.placeFx = 0;
   }
 
   get item() {
@@ -93,7 +103,7 @@ export class Fighter {
     const dir = new Vec3(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp);
     const right = new Vec3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const rig = this.ads ? CAM.ads : (this.buildMode || this.editMode) ? CAM.build : CAM.ground;
-    return { dir, right, ...rig };
+    return { dir, right, ...rig, shoulder: rig.shoulder * this.shoulder };
   }
 
   // Ray through the crosshair, pushed forward to the fighter's depth so a shot
@@ -109,6 +119,13 @@ export class Fighter {
   // Hit volumes at `pos` (defaults to now). Lag compensation passes a past
   // position and whether the fighter was airborne then.
   hitboxes(p = this.pos, airborne = this.airborne) {
+    if (!airborne && this.crouch) {
+      const h = PLAYER.crouchHeight;
+      return {
+        body: { min: { x: p.x - 0.42, y: p.y, z: p.z - 0.42 }, max: { x: p.x + 0.42, y: p.y + h * 0.75, z: p.z + 0.42 } },
+        head: { min: { x: p.x - 0.26, y: p.y + h * 0.75, z: p.z - 0.26 }, max: { x: p.x + 0.26, y: p.y + h + 0.2, z: p.z + 0.26 } },
+      };
+    }
     if (airborne) {
       return { body: { min: { x: p.x - 0.6, y: p.y + 0.3, z: p.z - 0.6 }, max: { x: p.x + 0.6, y: p.y + 1.5, z: p.z + 0.6 } }, head: null };
     }

@@ -53,3 +53,10 @@ export const BOT_NAMES = [
   'Boss Bean', 'Cobalt', 'Black Knight', 'Aura', 'Crystal', 'Banshee', 'Hunter', 'Juniper',
   'Kit', 'Slate', 'Waffles', 'Bushman', 'Dark Star', 'Galaxy',
 ];
+
+// Emote ids are 1..25 in this order. All original gestures and dances.
+export const EMOTE_NAMES = [
+  'Wave', 'Sway Jam', 'Pogo Hop', 'Flex', 'Clap', 'Spin Cycle', 'Robot March', 'Salute', 'Bow',
+  'Thinker', 'Jumping Jacks', 'Shrug', 'Victory Pose', 'Slow Clap', 'Hip Roll', 'Windmill', 'Glide Step',
+  'Cheer', 'Stretch', 'Shadow Box', 'Conductor', 'Heart Hands', 'Point and Laugh', 'Squat Pump', 'Rock Out',
+];

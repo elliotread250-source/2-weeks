@@ -5,7 +5,7 @@
 // WebSocket is TCP, so delivery is ordered and reliable; "delta encoding" here
 // means we only send entities whose quantised state changed since we last sent
 // them to that client, and we send explicit removals when they leave interest.
-import { WEAPONS, CONSUMABLES } from '../config.js';
+import { WEAPONS, CONSUMABLES, EMOTE_COUNT } from '../config.js';
 
 export const MSG = { CMD: 0x01, SNAPSHOT: 0x81 };
 
@@ -76,7 +76,7 @@ export class Reader {
 
 // ---------------------------------------------------------------- commands
 
-const CMD_BYTES = 25;
+const CMD_BYTES = 26;
 export const MAX_CMDS_PER_PACKET = 8;
 
 export function encodeCommands(cmds) {
@@ -87,7 +87,7 @@ export function encodeCommands(cmds) {
     w.i8(Math.round(c.mx * 127)).i8(Math.round(c.mz * 127));
     w.f32(c.yaw).f32(c.pitch);
     w.u8(c.held).u16(c.act);
-    w.i8(c.slot).i8(c.slotStep).i8(c.piece).i8(c.matStep);
+    w.i8(c.slot).i8(c.slotStep).i8(c.piece).i8(c.matStep).i8(c.emote || 0);
   }
   return w.bytes();
 }
@@ -103,8 +103,8 @@ export function decodeCommands(data) {
     const mx = r.i8() / 127, mz = r.i8() / 127;
     const yaw = r.f32(), pitch = r.f32();
     const held = r.u8(), act = r.u16();
-    const slot = r.i8(), slotStep = r.i8(), piece = r.i8(), matStep = r.i8();
-    out.push(sanitizeCommand({ seq, viewTick, mx, mz, yaw, pitch, held, act, slot, slotStep, piece, matStep }));
+    const slot = r.i8(), slotStep = r.i8(), piece = r.i8(), matStep = r.i8(), emote = r.i8();
+    out.push(sanitizeCommand({ seq, viewTick, mx, mz, yaw, pitch, held, act, slot, slotStep, piece, matStep, emote }));
   }
   return out;
 }
@@ -120,12 +120,13 @@ export function sanitizeCommand(c) {
     mz: clamp(fin(c.mz), -1, 1),
     yaw: fin(c.yaw) % (Math.PI * 200),
     pitch: clamp(fin(c.pitch), -1.5, 1.5),
-    held: c.held & 0x7f,
-    act: c.act & 0x3ff,
+    held: c.held & 0xff,
+    act: c.act & 0x7ff,
     slot: clamp(c.slot | 0, -1, 5),
     slotStep: clamp(c.slotStep | 0, -1, 1),
     piece: clamp(c.piece | 0, -1, 3),
     matStep: clamp(c.matStep | 0, -1, 1),
+    emote: clamp(c.emote | 0, -1, EMOTE_COUNT),
   };
 }
 
@@ -153,6 +154,10 @@ export function writeRecord(w, f) {
   w.u16(QUANT.yaw(f.yaw)).i8(QUANT.pitch(f.pitch));
   w.u8(Math.ceil(f.hp)).u8(Math.ceil(f.shield)).u8(f.selected).u8(held.code).u8(held.rarity);
   w.u8(Math.min(255, Math.round(f.swingT * 100)));
+  // Animation flags: what the animator needs to pose a remote fighter.
+  const anim = (f.heal ? 1 : 0) | (f.reloadT > 0 ? 2 : 0) | (f.fireFx > 0 ? 4 : 0) | (f.crouch ? 8 : 0)
+    | (f.placeFx > 0 ? 16 : 0) | (f.hitFx > 0 ? 32 : 0) | (f.hitHead ? 64 : 0);
+  w.u8(anim).u8(Math.round((f.hitDir / (Math.PI * 2)) * 255) & 255).u8(f.emote);
 }
 
 export function readRecord(r) {
@@ -162,11 +167,14 @@ export function readRecord(r) {
   const yaw = QUANT.unyaw(r.u16()), pitch = QUANT.unpitch(r.i8());
   const hp = r.u8(), shield = r.u8(), selected = r.u8(), heldCode = r.u8(), heldRarity = r.u8();
   const swingT = r.u8() / 100;
+  const anim = r.u8(), hitDir = (r.u8() / 255) * Math.PI * 2, emote = r.u8();
   return {
     id, alive: !!(flags & F.ALIVE), onGround: !!(flags & F.GROUND), swimming: !!(flags & F.SWIM),
     ads: !!(flags & F.ADS), scoped: !!(flags & F.SCOPED), buildMode: !!(flags & F.BUILD),
     editMode: !!(flags & F.EDIT), human: !!(flags & F.HUMAN),
     state, x, y, z, vx, vy, vz, yaw, pitch, hp, shield, selected, heldCode, heldRarity, swingT,
+    healing: !!(anim & 1), reloading: !!(anim & 2), firing: !!(anim & 4), crouch: !!(anim & 8),
+    placing: !!(anim & 16), hitReact: !!(anim & 32), hitHead: !!(anim & 64), hitDir, emote,
   };
 }
 

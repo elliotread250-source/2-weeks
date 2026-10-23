@@ -1,8 +1,9 @@
-// Character models and their animation, drawn from sim fighter state. The sim
-// knows nothing about meshes; a FighterView reads a Fighter every frame.
+// Held items (guns, pickaxe, glider) and FighterView: the bridge from a sim
+// Fighter to a skinned, animated character. The sim knows nothing about meshes.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RARITIES } from '/shared/config.js';
+import { buildRig } from './rig.js';
+import { Animator } from './animator.js';
 
 const box = (w, h, d, color) => new THREE.Mesh(
   new THREE.BoxGeometry(w, h, d),
@@ -78,250 +79,80 @@ function gliderMesh(color) {
   return g;
 }
 
-// Several boxes merged into one vertex-coloured mesh, so a detailed
-// character still costs only a handful of draw calls.
-const partMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-function parts(list) {
-  const geos = [];
-  const c = new THREE.Color();
-  for (const [w, h, d, x, y, z, color, rx = 0, ry = 0, rz = 0] of list) {
-    const g = new THREE.BoxGeometry(w, h, d);
-    if (rx || ry || rz) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz)));
-    g.translate(x, y, z);
-    c.set(color);
-    const n = g.attributes.position.count;
-    const col = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    g.deleteAttribute('uv');
-    geos.push(g.index ? g.toNonIndexed() : g);
-  }
-  const m = new THREE.Mesh(mergeGeometries(geos), partMat);
-  m.castShadow = true;
-  return m;
-}
 
-function hairParts(o) {
-  const h = o.hair;
-  switch (o.hairStyle) {
-    case 'spiky':
-      return [[0.41, 0.1, 0.41, 0, 0.42, 0, h], [0.1, 0.18, 0.1, -0.12, 0.52, 0.05, h, 0, 0, 0.3], [0.1, 0.22, 0.1, 0, 0.55, 0, h],
-        [0.1, 0.18, 0.1, 0.12, 0.52, 0.05, h, 0, 0, -0.3], [0.1, 0.16, 0.1, 0, 0.5, 0.14, h, -0.4, 0, 0], [0.41, 0.08, 0.1, 0, 0.37, -0.17, h]];
-    case 'cap':
-      return [[0.42, 0.14, 0.42, 0, 0.44, 0, o.accent], [0.42, 0.04, 0.2, 0, 0.38, -0.27, o.accent], [0.08, 0.04, 0.08, 0, 0.52, 0, o.pack]];
-    case 'pony':
-      return [[0.41, 0.12, 0.41, 0, 0.42, 0, h], [0.41, 0.08, 0.1, 0, 0.36, -0.17, h], [0.12, 0.34, 0.12, 0, 0.26, 0.26, h, 0.3, 0, 0], [0.13, 0.06, 0.13, 0, 0.42, 0.22, o.accent]];
-    case 'mohawk':
-      return [[0.39, 0.04, 0.39, 0, 0.4, 0, h], [0.08, 0.2, 0.42, 0, 0.5, 0.01, o.accent]];
-    case 'helmet':
-      return [[0.44, 0.22, 0.44, 0, 0.36, 0, o.accent], [0.36, 0.08, 0.04, 0, 0.26, -0.22, '#1b2631'], [0.06, 0.1, 0.06, 0.2, 0.36, 0, o.pack]];
-    default:
-      return [[0.41, 0.14, 0.41, 0, 0.42, 0, h], [0.41, 0.08, 0.1, 0, 0.36, -0.17, h], [0.06, 0.16, 0.36, -0.2, 0.3, 0.02, h], [0.06, 0.16, 0.36, 0.2, 0.3, 0.02, h]];
-  }
-}
-
-function blingParts(o) {
-  switch (o.bling) {
-    case 'cape':
-      return [[0.52, 0.85, 0.04, 0, 0.0, 0.2, o.pack, 0.12], [0.54, 0.06, 0.06, 0, 0.42, 0.18, o.accent]];
-    case 'wings':
-      return [[0.12, 0.2, 0.12, 0, 0.36, 0.24, o.accent], [0.5, 0.36, 0.04, -0.28, 0.44, 0.27, o.pack, 0, 0.3, 0.35], [0.5, 0.36, 0.04, 0.28, 0.44, 0.27, o.pack, 0, -0.3, -0.35]];
-    case 'sword':
-      return [[0.06, 0.85, 0.03, 0, 0.32, 0.25, '#d6eaf8', 0, 0, 0.6], [0.24, 0.06, 0.06, -0.05, 0.02, 0.25, o.accent, 0, 0, 0.6], [0.06, 0.2, 0.06, -0.12, -0.1, 0.25, '#5d4037', 0, 0, 0.6]];
-    case 'guitar':
-      return [[0.32, 0.34, 0.08, 0.05, 0.18, 0.25, o.pack, 0, 0, -0.4], [0.06, 0.5, 0.05, -0.12, 0.55, 0.25, '#4e342e', 0, 0, -0.4], [0.1, 0.1, 0.09, 0.05, 0.18, 0.25, '#111', 0, 0, -0.4]];
-    default:
-      return [[0.42, 0.46, 0.2, 0, 0.36, 0.26, o.pack], [0.34, 0.16, 0.06, 0, 0.26, 0.38, o.accent], [0.44, 0.06, 0.22, 0, 0.6, 0.26, o.accent],
-        [0.05, 0.5, 0.04, -0.18, 0.36, 0.15, '#2d3436'], [0.05, 0.5, 0.04, 0.18, 0.36, 0.15, '#2d3436']];
-  }
-}
-
-export function buildModel(outfit) {
-  const o = { accent: '#f1c40f', gloves: '#2c3e50', hairStyle: 'short', bling: 'pack', ...outfit };
-  const root = new THREE.Group();
-  const body = new THREE.Group(); // tilts for skydiving
-  root.add(body);
-  const hips = new THREE.Group();
-  hips.position.y = 0.9;
-  body.add(hips);
-
-  const legL = new THREE.Group(), legR = new THREE.Group();
-  for (const [leg, x] of [[legL, -0.15], [legR, 0.15]]) {
-    leg.position.set(x, 0, 0);
-    leg.add(parts([
-      [0.25, 0.46, 0.29, 0, -0.23, 0, o.pants],
-      [0.23, 0.42, 0.27, 0, -0.63, 0, o.pants],
-      [0.26, 0.16, 0.06, 0, -0.42, -0.15, o.accent], // knee pad
-      [0.26, 0.14, 0.36, 0, -0.86, -0.04, '#222'], // shoe
-      [0.27, 0.05, 0.38, 0, -0.92, -0.04, '#f2f2f2'], // sole
-      [0.27, 0.05, 0.14, 0, -0.8, -0.14, o.accent], // laces
-      [0.1, 0.14, 0.1, x > 0 ? 0.14 : -0.14, -0.3, 0.02, '#4e5b60'], // thigh pouch
-    ]));
-    hips.add(leg);
-  }
-  hips.add(parts([
-    [0.58, 0.66, 0.32, 0, 0.33, 0, o.shirt],
-    [0.6, 0.08, 0.34, 0, 0.02, 0, '#3b2f2f'], // belt
-    [0.1, 0.07, 0.03, 0, 0.02, -0.18, '#d4ac0d'], // buckle
-    [0.12, 0.12, 0.08, -0.2, 0.05, -0.18, '#4e5b60'], // pouches
-    [0.12, 0.12, 0.08, 0.2, 0.05, -0.18, '#4e5b60'],
-    [0.6, 0.12, 0.02, 0, 0.5, -0.17, o.accent], // chest stripe
-    [0.22, 0.2, 0.02, -0.13, 0.3, -0.17, o.pants], // pocket
-    [0.26, 0.08, 0.34, 0, 0.66, 0, o.shirt], // collar
-    [0.16, 0.06, 0.2, 0, 0.7, 0, o.skin], // neck
-  ]));
-  hips.add(parts(blingParts(o)));
-
-  const head = new THREE.Group();
-  head.position.y = 0.66;
-  head.add(parts([
-    [0.38, 0.38, 0.38, 0, 0.22, 0, o.skin],
-    [0.07, 0.07, 0.02, -0.09, 0.25, -0.195, '#ffffff'],
-    [0.07, 0.07, 0.02, 0.09, 0.25, -0.195, '#ffffff'],
-    [0.04, 0.05, 0.02, -0.085, 0.245, -0.205, '#1b1b1b'],
-    [0.04, 0.05, 0.02, 0.095, 0.245, -0.205, '#1b1b1b'],
-    [0.09, 0.025, 0.02, -0.09, 0.31, -0.2, o.hair], // brows
-    [0.09, 0.025, 0.02, 0.09, 0.31, -0.2, o.hair],
-    [0.05, 0.07, 0.05, 0, 0.19, -0.21, o.skin], // nose
-    [0.12, 0.025, 0.02, 0, 0.12, -0.195, '#7b3b2f'], // mouth
-    [0.04, 0.08, 0.06, -0.2, 0.22, 0, o.skin], // ears
-    [0.04, 0.08, 0.06, 0.2, 0.22, 0, o.skin],
-    ...hairParts(o),
-  ]));
-  hips.add(head);
-
-  const armL = new THREE.Group(), armR = new THREE.Group();
-  for (const [arm, x] of [[armL, -0.38], [armR, 0.38]]) {
-    arm.position.set(x, 0.6, 0);
-    arm.add(parts([
-      [0.2, 0.14, 0.22, 0, -0.02, 0, o.accent], // shoulder pad
-      [0.18, 0.3, 0.2, 0, -0.16, 0, o.shirt],
-      [0.16, 0.3, 0.18, 0, -0.44, 0, o.skin],
-      [0.17, 0.08, 0.19, 0, -0.3, 0, o.shirt], // cuff
-      [0.17, 0.14, 0.19, 0, -0.62, 0, o.gloves], // glove
-      [0.06, 0.08, 0.06, x > 0 ? -0.06 : 0.06, -0.62, -0.1, o.gloves], // thumb
-    ]));
-    hips.add(arm);
-  }
-  const hand = new THREE.Group();
-  hand.position.set(0, -0.62, 0);
-  armR.add(hand);
-
-  const glider = gliderMesh(o.pack);
-  glider.visible = false;
-  root.add(glider);
-
-  root.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-  return { root, body, hips, legL, legR, armL, armR, head, hand, glider, held: null, heldKey: '' };
-}
-
+// Distance bands: full detail and foot IK, reduced animation rate, then a stand-in.
+const LOD_NEAR = 40;
+const LOD_FAR = 150;
 
 export class FighterView {
-  constructor(scene, fighter) {
+  constructor(scene, fighter, { groundAt = null } = {}) {
     this.scene = scene;
     this.f = fighter;
-    this.model = buildModel(fighter.outfit);
-    scene.add(this.model.root);
-    this.walkPhase = 0;
+    this.rig = buildRig(fighter.outfit);
+    this.animator = new Animator(this.rig, groundAt);
+    scene.add(this.rig.root);
+    this.glider = gliderMesh(this.rig.outfit.pack);
+    this.glider.visible = false;
+    this.rig.root.add(this.glider);
+    this.held = null;
+    this.heldKey = '';
     this.local = false;
+    this.pending = 0; // time banked while animation is throttled
+    this.model = { root: this.rig.root }; // kept for callers that only need the root
   }
 
-  // alpha is how far we are between the previous and current sim tick.
-  update(dt, time, alpha) {
+  // alpha: how far between the previous and current sim tick. cam: camera position for LOD.
+  update(dt, time, alpha, cam) {
     const f = this.f;
-    const m = this.model;
-    m.root.visible = f.alive && !f.hidden && f.state !== 'bus' && !(this.local && f.scoped);
-    if (!m.root.visible) return;
+    const root = this.rig.root;
+    root.visible = f.alive && !f.hidden && f.state !== 'bus';
+    this.rig.mesh.visible = !(this.local && f.scoped);
+    if (!root.visible) return;
     const x = f.prev.x + (f.pos.x - f.prev.x) * alpha + f.smooth.x;
     const y = f.prev.y + (f.pos.y - f.prev.y) * alpha + f.smooth.y;
     const z = f.prev.z + (f.pos.z - f.prev.z) * alpha + f.smooth.z;
-    m.root.position.set(x, y, z);
-    m.root.rotation.y = f.yaw;
-    this.pose(dt, time);
+    root.position.set(x, y, z);
+    root.rotation.y = f.yaw;
+
+    const d = cam ? Math.hypot(cam.x - x, cam.y - y, cam.z - z) : 0;
+    const level = this.local || d < LOD_NEAR ? 0 : d < LOD_FAR ? 1 : 2;
+    this.rig.lod.visible = level === 2;
+    this.rig.mesh.visible = this.rig.mesh.visible && level < 2;
+    this.glider.visible = f.state === 'glide';
+    if (level === 2) return;
+
+    this.syncHeld();
+    // Mid-range characters animate at half rate; they are small on screen.
+    this.pending += dt;
+    if (level === 1 && this.pending < 1 / 30) return;
+    this.animator.update(this.pending, f, level);
+    this.pending = 0;
   }
 
-  pose(dt, time) {
+  syncHeld() {
     const f = this.f;
-    const m = this.model;
-
-    // What's in hand.
     const w = f.weapon;
-    let heldKey = w ? `${w.type}:${w.rarity}` : (f.selected === 0 ? 'pick' : (f.item ? 'item' : ''));
-    if (f.state === 'skydive' || f.state === 'glide' || f.state === 'bus') heldKey = '';
-    if (heldKey !== m.heldKey) {
-      if (m.held) m.hand.remove(m.held);
-      m.held = null;
-      if (heldKey === 'pick') m.held = pickaxeMesh();
-      else if (w && heldKey) m.held = gunMesh(w.type, w.rarity);
-      else if (heldKey === 'item') {
-        const it = f.item;
-        m.held = box(0.22, 0.22, 0.22, it.type === 'bandage' ? '#f5f5f5' : it.type === 'medkit' ? '#e74c3c' : it.type === 'chug' ? '#3fa6f2' : '#4aa3ff');
-      }
-      if (m.held) {
-        m.held.rotation.x = -Math.PI / 2;
-        m.hand.add(m.held);
-      }
-      m.heldKey = heldKey;
+    let key = w ? `${w.type}:${w.rarity}` : (f.selected === 0 ? 'pick' : (f.item ? 'item' : ''));
+    if (f.airborne || f.state === 'bus' || f.emote > 0) key = '';
+    if (key === this.heldKey) return;
+    const sock = this.rig.sockets.right;
+    if (this.held) sock.remove(this.held);
+    this.held = null;
+    if (key === 'pick') this.held = pickaxeMesh();
+    else if (w && key) this.held = gunMesh(w.type, w.rarity);
+    else if (key === 'item') {
+      const it = f.item;
+      this.held = box(0.22, 0.22, 0.22, it.type === 'bandage' ? '#f5f5f5' : it.type === 'medkit' ? '#e74c3c' : it.type === 'chug' ? '#3fa6f2' : '#4aa3ff');
     }
-    const speed = Math.hypot(f.vel.x, f.vel.z);
-    m.glider.visible = f.state === 'glide';
-    m.body.rotation.x = 0;
-    m.body.position.y = 0;
-
-    if (f.state === 'skydive') {
-      m.body.rotation.x = -1.25;
-      m.body.position.y = 1.0;
-      m.armL.rotation.set(0, 0, 1.4 + Math.sin(time * 8) * 0.1);
-      m.armR.rotation.set(0, 0, -1.4 - Math.sin(time * 8) * 0.1);
-      m.legL.rotation.x = 0.3; m.legR.rotation.x = 0.4;
-      return;
+    if (this.held) {
+      this.held.rotation.x = -Math.PI / 2;
+      sock.add(this.held);
     }
-    if (f.state === 'glide') {
-      m.armL.rotation.set(0, 0, 2.6);
-      m.armR.rotation.set(0, 0, -2.6);
-      m.legL.rotation.x = 0.15; m.legR.rotation.x = -0.1;
-      return;
-    }
-
-    if (speed > 0.5 && f.onGround) this.walkPhase += dt * speed * 1.6;
-    else this.walkPhase *= 0.9;
-    const s = Math.sin(this.walkPhase) * Math.min(1, speed / 5);
-    m.legL.rotation.x = s * 0.7;
-    m.legR.rotation.x = -s * 0.7;
-    if (!f.onGround && !f.swimming) { m.legL.rotation.x = -0.5; m.legR.rotation.x = 0.3; }
-
-    // Arms: aim the gun along pitch, or swing the pickaxe.
-    m.armL.rotation.set(0, 0, 0);
-    m.armR.rotation.set(0, 0, 0);
-    m.hips.rotation.set(0, 0, 0);
-    if (f.selected === 0) {
-      if (f.swingT > 0) {
-        // Wind up over the shoulder, chop down hard, then recover.
-        const t = 1 - f.swingT / 0.42;
-        const ease = (a, b, k) => a + (b - a) * (k * k * (3 - 2 * k));
-        let arm, twist, lean;
-        if (t < 0.3) { const k = t / 0.3; arm = ease(0.7, 3.3, k); twist = ease(0, 0.4, k); lean = ease(0, -0.12, k); }
-        else if (t < 0.45) { const k = (t - 0.3) / 0.15; arm = 3.3 + (-0.2 - 3.3) * k; twist = 0.4 + (-0.3 - 0.4) * k; lean = -0.12 + (0.22 + 0.12) * k; }
-        else { const k = (t - 0.45) / 0.55; arm = ease(-0.2, 0.7, k); twist = ease(-0.3, 0, k); lean = ease(0.22, 0, k); }
-        m.armR.rotation.x = arm;
-        m.armL.rotation.x = arm * 0.85;
-        m.armL.rotation.z = -0.35;
-        m.hips.rotation.y = twist;
-        m.hips.rotation.x = lean;
-      } else {
-        m.armR.rotation.x = 0.7 + s * 0.3;
-        m.armL.rotation.x = -s * 0.5;
-      }
-    } else {
-      const aim = Math.PI / 2 + f.pitch;
-      m.armR.rotation.x = aim;
-      m.armL.rotation.x = aim;
-      m.armL.rotation.z = -0.5;
-    }
-    m.head.rotation.x = f.pitch * 0.5;
+    this.heldKey = key;
   }
 
   dispose() {
-    this.scene.remove(this.model.root);
+    this.animator.dispose();
+    this.scene.remove(this.rig.root);
   }
 }

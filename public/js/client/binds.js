@@ -11,6 +11,7 @@ export const ACTIONS = [
   { id: 'right', label: 'Move right', group: 'Movement', def: 'KeyD' },
   { id: 'jump', label: 'Jump / glider', group: 'Movement', def: 'Space' },
   { id: 'sprint', label: 'Sprint', group: 'Movement', def: 'ShiftLeft' },
+  { id: 'crouch', label: 'Crouch', group: 'Movement', def: 'ControlLeft' },
   { id: 'fire', label: 'Fire / place / select tiles', group: 'Combat', def: 'Mouse0' },
   { id: 'aim', label: 'Aim down sights', group: 'Combat', def: 'Mouse2' },
   { id: 'reload', label: 'Reload', group: 'Combat', def: 'KeyR' },
@@ -29,11 +30,13 @@ export const ACTIONS = [
   { id: 'matCycle', label: 'Change material', group: 'Building', def: 'KeyT' },
   { id: 'edit', label: 'Edit', group: 'Building', def: 'KeyF' },
   { id: 'editReset', label: 'Reset edit', group: 'Building', def: 'Mouse2' },
+  { id: 'emote', label: 'Play next emote (wheel comes with the locker)', group: 'Other', def: 'KeyB' },
+  { id: 'swapShoulder', label: 'Swap camera shoulder', group: 'Other', def: 'KeyG' },
   { id: 'map', label: 'Map', group: 'Other', def: 'KeyM' },
 ];
 
 export const DEFAULT_BINDS = Object.fromEntries(ACTIONS.map((a) => [a.id, a.def]));
-export const DEFAULT_SETTINGS = { confirmEditOnRelease: true, sensitivity: 1, shadows: true, detail: 'high' };
+export const DEFAULT_SETTINGS = { confirmEditOnRelease: true, sensitivity: 1, shadows: true, detail: 'high', shake: 1 };
 
 function load(key, defaults) {
   try {

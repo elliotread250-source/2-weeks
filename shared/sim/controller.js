@@ -1,22 +1,22 @@
 // Turns one input command into fighter state for one tick. This is the only
 // path from a human's keyboard to the simulation, so the same code runs in the
 // browser (offline and, later, for prediction) and on the server.
-import { PLAYER, WEAPONS, BUILD_COST, MAT_ORDER, INTERACT } from '../config.js';
+import { PLAYER, WEAPONS, BUILD_COST, MAT_ORDER, INTERACT, EMOTE_COUNT } from '../config.js';
 import { Vec3 } from '../math/vec3.js';
 import { itemRarity } from './loot.js';
 
 // Buttons currently held.
 export const HELD = {
-  FIRE: 1, AIM: 2, JUMP: 4, SPRINT: 8, INTERACT: 16, FORWARD: 32, CONFIRM_RELEASE: 64,
+  FIRE: 1, AIM: 2, JUMP: 4, SPRINT: 8, INTERACT: 16, FORWARD: 32, CONFIRM_RELEASE: 64, CROUCH: 128,
 };
 // Edge events since the previous command (pressed this tick, never lost).
 export const ACT = {
-  JUMP: 1, FIRE: 2, FIRE_UP: 4, INTERACT: 8, RELOAD: 16, BUILD: 32, EDIT: 64, EDIT_RESET: 128, AIM: 256, MAT: 512,
+  JUMP: 1, FIRE: 2, FIRE_UP: 4, INTERACT: 8, RELOAD: 16, BUILD: 32, EDIT: 64, EDIT_RESET: 128, AIM: 256, MAT: 512, SHOULDER: 1024,
 };
 export const PIECES = ['wall', 'floor', 'ramp', 'cone'];
 
 export function emptyCommand() {
-  return { seq: 0, mx: 0, mz: 0, yaw: 0, pitch: 0, held: 0, act: 0, slot: -1, slotStep: 0, piece: -1, matStep: 0, viewTick: 0 };
+  return { seq: 0, mx: 0, mz: 0, yaw: 0, pitch: 0, held: 0, act: 0, slot: -1, slotStep: 0, piece: -1, matStep: 0, viewTick: 0, emote: 0 };
 }
 
 const nextMat = (m, step = 1) => MAT_ORDER[(MAT_ORDER.indexOf(m) + step + MAT_ORDER.length) % MAT_ORDER.length];
@@ -28,6 +28,7 @@ export function applyCommand(match, f, cmd, dt) {
 
   f.yaw = cmd.yaw;
   f.pitch = cmd.pitch;
+  if (act(ACT.SHOULDER)) f.shoulder = -f.shoulder;
 
   if (match.phase === 'bus' && f.state === 'bus') {
     if (act(ACT.JUMP)) match.jumpFromBus(f);
@@ -85,6 +86,18 @@ export function applyCommand(match, f, cmd, dt) {
 
   applyMovement(match, f, cmd, dt);
 
+  // ---- emotes: start on request, cancel on movement, firing or building
+  if (cmd.emote > 0 && cmd.emote <= EMOTE_COUNT && !airborne && f.onGround && !f.heal && f.emoteCd <= 0) {
+    f.emote = cmd.emote;
+    f.emoteT = 0;
+  }
+  f.emoteCd = Math.max(0, f.emoteCd - dt);
+  if (f.emote) {
+    f.emoteT += dt;
+    const moved = Math.hypot(f.vel.x, f.vel.z) > 1.2;
+    if (moved || airborne || f.buildMode || held(HELD.FIRE) || cmd.emote === -1) { f.emote = 0; f.emoteCd = 0.3; }
+  }
+
   // ---- actions
   f.buildCd -= dt;
   if (f.editMode) updateEdit(match, f, cmd, act, held);
@@ -103,6 +116,7 @@ export function applyMovement(match, f, cmd, dt) {
   f.pitch = cmd.pitch;
   if (!f.alive || f.state === 'bus') return;
   const airborne = f.airborne;
+  f.crouch = held(HELD.CROUCH) && !airborne && f.onGround && !f.swimming;
   if (f.state === 'skydive' && act(ACT.JUMP)) {
     const above = f.pos.y - match.collision.groundHeight(f.pos.x, f.pos.z, f.pos.y);
     if (above < 110) { f.state = 'glide'; match.emit('sfx', { name: 'glider', by: f.id, own: true }); }
@@ -127,6 +141,7 @@ export function applyMovement(match, f, cmd, dt) {
     if (sprinting) speed = PLAYER.sprintSpeed;
     if (f.ads) speed = PLAYER.adsSpeed;
     if (f.heal) speed = PLAYER.healSpeed;
+    if (f.crouch) speed = Math.min(speed, PLAYER.crouchSpeed);
     if (f.swimming) speed = PLAYER.swimSpeed;
     const acc = f.onGround ? 14 : 3;
     f.vel.x += (wish.x * speed - f.vel.x) * Math.min(1, acc * dt);
@@ -177,6 +192,7 @@ function updateBuild(match, f, act, held) {
       f.mats[f.buildMat] -= BUILD_COST;
       match.emit('sfx', { name: 'build', by: f.id, own: true });
       f.buildCd = 0.06;
+      f.placeFx = 0.2;
     }
   } else if (act(ACT.FIRE) && !afford) {
     match.emit('message', { to: f.id, text: '', sub: `Not enough ${f.buildMat}`, dur: 1.2 });

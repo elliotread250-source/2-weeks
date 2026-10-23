@@ -55,6 +55,7 @@ function renderBinds() {
 function openSettings() {
   $('#sens').value = settings.sensitivity;
   $('#sens-out').textContent = Number(settings.sensitivity).toFixed(2);
+  $('#shake').value = settings.shake ?? 1;
   $('#confirm-release').checked = !!settings.confirmEditOnRelease;
   $('#graphics').checked = settings.shadows !== false;
   $('#detail').value = settings.detail || 'high';
@@ -111,6 +112,7 @@ $('#sens').addEventListener('input', (e) => {
   setSetting('sensitivity', parseFloat(e.target.value) || 1);
   $('#sens-out').textContent = Number(settings.sensitivity).toFixed(2);
 });
+$('#shake').addEventListener('input', (e) => setSetting('shake', parseFloat(e.target.value)));
 $('#confirm-release').addEventListener('change', (e) => setSetting('confirmEditOnRelease', e.target.checked));
 $('#graphics').addEventListener('change', (e) => setSetting('shadows', e.target.checked));
 $('#detail').addEventListener('change', (e) => setSetting('detail', e.target.value));

@@ -153,6 +153,15 @@ export class NetHost {
     f.selected = r.selected;
     f.swingT = r.swingT;
     f.vel.set(r.vx, r.vy, r.vz);
+    f.crouch = r.crouch;
+    f.emote = r.emote;
+    f.fireFx = r.firing ? 0.1 : 0;
+    f.placeFx = r.placing ? 0.1 : 0;
+    f.hitFx = r.hitReact ? 0.2 : 0;
+    f.hitHead = r.hitHead;
+    f.hitDir = r.hitDir;
+    f.animHeal = r.healing;
+    f.animReload = r.reloading;
   }
 
   applyRemote(r, t) {

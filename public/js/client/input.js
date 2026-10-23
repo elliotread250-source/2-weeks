@@ -3,6 +3,7 @@
 // including presses that happen between ticks.
 import { binds, settings } from './binds.js';
 import { HELD, ACT, PIECES, emptyCommand } from '/shared/sim/controller.js';
+import { EMOTE_COUNT } from '/shared/config.js';
 
 const SLOT_ACTIONS = ['pickaxe', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5'];
 
@@ -17,6 +18,9 @@ export class InputController {
     this.locked = false;
     this.mapOpen = false;
     this.seq = 0;
+    this.shoulder = 1;
+    this.nextEmote = 1;
+    this.emoteReq = 0;
     this.resetEdges();
     this.bind();
   }
@@ -27,6 +31,7 @@ export class InputController {
     this.slotStep = 0;
     this.piece = -1;
     this.matStep = 0;
+    this.emoteReq = 0;
   }
 
   held(action) { return this.keys.has(binds[action]); }
@@ -51,6 +56,8 @@ export class InputController {
         case 'editReset': this.act |= ACT.EDIT_RESET; break;
         case 'aim': this.act |= ACT.AIM; break;
         case 'matCycle': this.act |= ACT.MAT; break;
+        case 'swapShoulder': this.act |= ACT.SHOULDER; this.shoulder = -this.shoulder; break;
+        case 'emote': this.emoteReq = this.nextEmote; this.nextEmote = (this.nextEmote % EMOTE_COUNT) + 1; break;
         case 'map': this.mapOpen = !this.mapOpen; break;
         default:
           if (SLOT_ACTIONS.includes(a)) this.slot = SLOT_ACTIONS.indexOf(a);
@@ -110,6 +117,7 @@ export class InputController {
 
   // Apply mouse movement to the look angles. Runs every rendered frame.
   updateLook(f) {
+    if (f) f.shoulder = this.shoulder;
     let sens = 0.0022 * (settings.sensitivity || 1);
     if (f && f.scoped) sens *= 0.25;
     else if (f && f.ads) sens *= 0.6;
@@ -132,6 +140,7 @@ export class InputController {
     if (this.held('aim')) held |= HELD.AIM;
     if (this.held('jump')) held |= HELD.JUMP;
     if (this.held('sprint')) held |= HELD.SPRINT;
+    if (this.held('crouch')) held |= HELD.CROUCH;
     if (this.held('interact')) held |= HELD.INTERACT;
     if (this.held('forward')) held |= HELD.FORWARD;
     if (settings.confirmEditOnRelease) held |= HELD.CONFIRM_RELEASE;
@@ -141,6 +150,7 @@ export class InputController {
     cmd.slotStep = this.slotStep;
     cmd.piece = this.piece;
     cmd.matStep = this.matStep;
+    cmd.emote = this.emoteReq || (this.held('forward') || this.held('back') || this.held('left') || this.held('right') ? -1 : 0);
     this.resetEdges();
     return cmd;
   }
