@@ -77,6 +77,11 @@
 
   <!-- Lobby -->
   <div id="lobby">
+    <div id="account-bar">
+      <span id="account-name">Guest</span>
+      <span id="account-coins" class="hidden"></span>
+      <button id="account-btn" class="ghost small">SIGN IN</button>
+    </div>
     <div class="lobby-bg"></div>
     <div class="lobby-content">
       <h1 class="logo">TWO WEEKS</h1>
@@ -104,6 +109,17 @@
         <button id="settings-btn" class="ghost">SETTINGS &amp; KEYBINDS</button>
       </div>
     </div>
+  </div>
+
+  <div id="auth" class="hidden">
+    <form class="card" id="auth-form" autocomplete="off">
+      <div class="tabs"><button type="button" id="tab-login" class="tab on">SIGN IN</button><button type="button" id="tab-register" class="tab">CREATE ACCOUNT</button></div>
+      <label>Username<input id="auth-user" maxlength="16" autocomplete="username" /></label>
+      <label>PIN (6 to 12 digits)<input id="auth-pin" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password" /></label>
+      <div id="auth-error"></div>
+      <div class="auth-actions"><button type="submit" id="auth-submit">SIGN IN</button><button type="button" id="auth-cancel" class="ghost">CANCEL</button></div>
+      <p class="hint">You can play without an account. An account keeps your coins, items and stats.</p>
+    </form>
   </div>
 
   <div id="pause" class="hidden">

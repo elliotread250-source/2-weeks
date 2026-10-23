@@ -346,7 +346,10 @@ export class Combat {
     target.shield -= toShield;
     target.hp -= toHealth;
     target.flash = 0.15;
-    if (source && source !== target) target.lastHitBy = { f: source, t: this.m.time };
+    if (source && source !== target) {
+      target.lastHitBy = { f: source, t: this.m.time };
+      if (!opts.storm) source.damageDealt += toShield + toHealth;
+    }
 
     const pt = opts.point || target.pos.clone().add(new Vec3(0, 1.8, 0));
     this.m.emit('hit', {

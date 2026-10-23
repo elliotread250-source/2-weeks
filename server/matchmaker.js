@@ -12,6 +12,7 @@ export class Matchmaker {
     this.lobbySeconds = opts.lobbySeconds ?? Number(process.env.LOBBY_SECONDS ?? 60);
     this.humanTarget = opts.humanTarget || Number(process.env.HUMAN_TARGET) || this.capacity;
     this.rooms = new Set();
+    this.db = opts.db || null;
   }
 
   // Past 70% of the tick budget across live rooms, stop topping up with bots.
@@ -27,7 +28,7 @@ export class Matchmaker {
     if (!room) {
       room = new Room({
         capacity: this.capacity, lobbySeconds: this.lobbySeconds, humanTarget: this.humanTarget, mode,
-        botBudget: () => this.botBudget(), onClose: (r) => this.rooms.delete(r),
+        botBudget: () => this.botBudget(), onClose: (r) => this.rooms.delete(r), db: this.db,
       });
       this.rooms.add(room);
     }

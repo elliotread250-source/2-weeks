@@ -6,6 +6,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { attachGameServer } from './server/index.js';
+import { Db } from './server/db.js';
+import { Accounts } from './server/accounts.js';
+import { createApi } from './server/api.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -45,14 +48,20 @@ function resolve(urlPath) {
   return { file, cache };
 }
 
-const server = http.createServer((req, res) => {
+export const db = new Db();
+export const accounts = new Accounts(db, process.env.SESSION_SECRET);
+const api = createApi({ db, accounts });
+if (!process.env.SESSION_SECRET) console.warn('[accounts] SESSION_SECRET is not set: sessions will not survive a restart');
+
+const server = http.createServer(async (req, res) => {
+  if (await api.handle(req, res)) return;
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('ok');
   }
   if (req.url === '/health/full') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ok: true, ...game.matchmaker.stats(), db: 'not configured' }));
+    return res.end(JSON.stringify({ ok: true, ...game.matchmaker.stats(), db: db.ready ? 'ok' : (db.lastError || 'down') }));
   }
   const hit = resolve(req.url);
   if (!hit) {
@@ -76,10 +85,11 @@ const server = http.createServer((req, res) => {
 export { server };
 
 // The game server shares this HTTP server's port at /ws.
-export const game = attachGameServer(server);
+export const game = attachGameServer(server, { accounts });
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   server.listen(PORT, () => {
     console.log(`Two Weeks running on http://localhost:${PORT}`);
+    db.start().then((ok) => console.log(ok ? '[db] ready' : '[db] unavailable, guests only'));
   });
 }

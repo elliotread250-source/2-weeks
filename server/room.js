@@ -9,6 +9,7 @@ import { emptyCommand } from '../shared/sim/controller.js';
 import { OUTFITS } from '../shared/cosmetics/outfits.js';
 import { encodeSnapshot, recordBytes, sameBytes } from '../shared/net/protocol.js';
 import { serializeEvent, buildWelcome } from '../shared/net/wire.js';
+import { recordMatch } from './results.js';
 
 const TICK_MS = 1000 / TICK_RATE;
 const SNAPSHOT_HZ = 20;
@@ -40,6 +41,7 @@ export class Room {
     this.timer = null;
     this.botBudget = opts.botBudget ?? (() => Infinity);
     this.onClose = opts.onClose || (() => {});
+    this.db = opts.db || null;
   }
 
   get humans() { return [...this.clients.values()]; }
@@ -138,7 +140,10 @@ export class Room {
       this.sendEvents(c, events, m);
       if (sendSnap) this.sendSnapshot(c, m);
     }
-    if (m.phase === 'over' && !this.overAt) this.overAt = now;
+    if (m.phase === 'over' && !this.overAt) {
+      this.overAt = now;
+      if (this.db) recordMatch(this.db, this).catch((e) => console.error('[results]', e.message));
+    }
     if (this.overAt && now - this.overAt > 8000) this.close();
   }
 

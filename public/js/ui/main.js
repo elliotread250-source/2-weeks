@@ -1,6 +1,7 @@
 // Entry point: lobby, settings/keybinds screen, then the match.
 import { Game } from '../client/game.js';
 import { NetHost } from '../client/nethost.js';
+import { initAccount } from './account.js';
 import { initAudio } from '../audio/audio.js';
 import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from '../client/binds.js';
 
@@ -68,6 +69,7 @@ function closeSettings() {
   if (game) game.rebinding = false;
   $('#settings').classList.add('hidden');
   renderControls();
+initAccount();
 }
 
 function finishListen(code) {
@@ -186,3 +188,4 @@ $('#quit-btn').addEventListener('click', leave);
 $('#again-btn').addEventListener('click', leave);
 
 renderControls();
+initAccount();
