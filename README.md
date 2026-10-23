@@ -1,6 +1,6 @@
 # Two Weeks
 
-A third-person build-and-shoot battle royale that runs in the browser. The map is a Rebirth Island style island (Call of Duty: Warzone's small Resurgence map) dressed up in Fortnite's look: bright greens, sandy beaches, cartoon buildings, a Battle Bus and gliders.
+A third-person build-and-shoot battle royale that runs in the browser. The map is a Rebirth Island style island (Call of Duty: Warzone's small Resurgence map) dressed up in Fortnite's look: bright greens, sandy beaches, cartoon buildings, a Drop Bus and gliders.
 
 You drop in with a pickaxe, 100 health and 100 shield against 24 bots. Farm materials, build, edit, loot rarity-coloured guns and outlast the storm.
 
@@ -12,7 +12,16 @@ npm start
 # open http://localhost:3000
 ```
 
-No build step. `server.js` is a zero-dependency static server that also serves three.js from `node_modules`, so the game never relies on a CDN. `/health` returns `ok` for Railway's health check.
+No build step. `server.js` is a zero-dependency static server. It serves `/public`, the shared simulation at `/shared` and three.js from `node_modules` at `/vendor/three`, so the game never relies on a CDN. `/health` returns `ok` for Railway's health check.
+
+```bash
+npm test                 # node:test suite for the simulation
+node tools/smoke.mjs     # headless-browser smoke test (add --deep for a scripted match)
+```
+
+## Code layout
+
+`shared/` is the whole game simulation with no rendering and no DOM, so it runs in Node and the browser. `public/js/` is the client: `render/` draws sim state, `client/` turns input into sim commands and sim events into visuals and sound, `ui/` is the HUD and menus. See ARCHITECTURE.md and PROGRESS.md.
 
 ## Controls
 
@@ -45,11 +54,11 @@ Every key is rebindable from **Settings & Keybinds** in the lobby or pause menu,
 
 **Weapons.** Common, Uncommon, Rare, Epic and Legendary rarities with Fortnite's colours and damage curves. Assault Rifle (30 to 36), Pump Shotgun, SMG, Pistol, Bolt-Action Sniper (scoped, Rare and up) and Rocket Launcher (Epic and up, wrecks builds). Headshot multipliers, bloom, ADS accuracy and shotgun falloff are all in. Ammo types: light, medium, heavy, shells, rockets.
 
-**Healing.** Bandages (+15 up to 75), Med Kit (to 100), Small Shield Potions (+25 up to 50), Shield Potions (+50) and the Chug Jug.
+**Healing.** Bandages (+15 up to 75), Med Kit (to 100), Small Shield Potions (+25 up to 50), Shield Potions (+50) and the Big Jug.
 
 **Loot.** Floor loot, gold chests, ammo boxes, and full loot explosions when someone is eliminated. Ammo and materials auto-pick up.
 
-**Match flow.** Battle Bus over a random route, skydive (look down and hold W to dive), glider auto-deploys near the ground. Six storm phases. Storm damage skips your shield like it does in Fortnite. Resurgence, the Rebirth Island signature, keeps redeploying you for the first three circles; after that, deaths are final. Last one standing gets the Victory Royale.
+**Match flow.** Drop Bus over a random route, skydive (look down and hold W to dive), glider auto-deploys near the ground. Six storm phases. Storm damage skips your shield like it does in Fortnite. Resurgence, the Rebirth Island signature, keeps redeploying you for the first three circles; after that, deaths are final. Last one standing gets the #1 VICTORY!.
 
 **Bots.** They pick a POI off the bus, loot, farm mats, fight with range-appropriate weapons, throw up walls and ramps when shot, heal when safe, rotate from the storm, and ramp over things they get stuck on.
 

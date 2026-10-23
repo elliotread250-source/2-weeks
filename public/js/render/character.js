@@ -1,24 +1,13 @@
-// Characters: the blocky Fortnite-style model plus the Fighter state shared by
-// the player and the bots (health, shield, inventory, ammo, materials).
+// Character models and their animation, drawn from sim fighter state. The sim
+// knows nothing about meshes; a FighterView reads a Fighter every frame.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PLAYER, WEAPONS, CONSUMABLES, RARITIES, MAX_MATS, AMMO } from './config.js';
+import { RARITIES } from '/shared/config.js';
 
 const box = (w, h, d, color) => new THREE.Mesh(
   new THREE.BoxGeometry(w, h, d),
   new THREE.MeshLambertMaterial({ color }),
 );
-
-export const OUTFITS = [
-  { shirt: '#2e86de', pants: '#34495e', skin: '#f2c49b', hair: '#5b3a1e', pack: '#e67e22', accent: '#f1c40f', gloves: '#2c3e50', hairStyle: 'short', bling: 'pack' },
-  { shirt: '#e74c3c', pants: '#2c3e50', skin: '#c68642', hair: '#111111', pack: '#f1c40f', accent: '#ecf0f1', gloves: '#111111', hairStyle: 'spiky', bling: 'cape' },
-  { shirt: '#27ae60', pants: '#6d4c41', skin: '#f5d0b0', hair: '#d4a017', pack: '#8e44ad', accent: '#f39c12', gloves: '#5d4037', hairStyle: 'pony', bling: 'wings' },
-  { shirt: '#8e44ad', pants: '#1c2833', skin: '#8d5524', hair: '#222222', pack: '#1abc9c', accent: '#ff6fb5', gloves: '#1c2833', hairStyle: 'cap', bling: 'sword' },
-  { shirt: '#f39c12', pants: '#5d6d7e', skin: '#ffdbac', hair: '#b03a2e', pack: '#2e86de', accent: '#2c3e50', gloves: '#7f8c8d', hairStyle: 'mohawk', bling: 'pack' },
-  { shirt: '#16a085', pants: '#4a235a', skin: '#e0ac69', hair: '#3e2723', pack: '#e74c3c', accent: '#f7dc6f', gloves: '#4a235a', hairStyle: 'helmet', bling: 'cape' },
-  { shirt: '#ecf0f1', pants: '#c0392b', skin: '#f1c27d', hair: '#4e342e', pack: '#2c3e50', accent: '#c0392b', gloves: '#c0392b', hairStyle: 'short', bling: 'guitar' },
-  { shirt: '#ff6fb5', pants: '#283747', skin: '#c68642', hair: '#f7dc6f', pack: '#58d68d', accent: '#ffffff', gloves: '#ff6fb5', hairStyle: 'pony', bling: 'wings' },
-];
 
 const gunCache = new Map();
 export function gunMesh(type, rarity) {
@@ -226,154 +215,46 @@ export function buildModel(outfit) {
   return { root, body, hips, legL, legR, armL, armR, head, hand, glider, held: null, heldKey: '' };
 }
 
-let fighterId = 1;
 
-export class Fighter {
-  constructor(scene, name, isPlayer, outfit) {
-    this.id = fighterId++;
-    this.name = name;
-    this.isPlayer = isPlayer;
+export class FighterView {
+  constructor(scene, fighter) {
     this.scene = scene;
-    this.outfit = outfit;
-    this.model = buildModel(outfit);
+    this.f = fighter;
+    this.model = buildModel(fighter.outfit);
     scene.add(this.model.root);
-    this.pos = new THREE.Vector3();
-    this.vel = new THREE.Vector3();
-    this.radius = PLAYER.radius;
-    this.height = PLAYER.height;
-    this.reset();
-    this.kills = 0;
-    this.eliminated = false;
-  }
-
-  reset() {
-    this.hp = PLAYER.maxHealth;
-    this.shield = PLAYER.maxShield;
-    this.alive = true;
-    this.state = 'bus';
-    this.yaw = 0;
-    this.pitch = 0;
-    this.onGround = false;
-    this.slots = [null, null, null, null, null];
-    this.selected = 0; // 0 = pickaxe, 1..5 = slots
-    this.ammo = { light: 0, medium: 0, heavy: 0, shells: 0, rockets: 0 };
-    this.mats = { wood: 0, brick: 0, metal: 0 };
-    this.fireCd = 0;
-    this.reloadT = 0;
-    this.bloom = 0;
-    this.heal = null;
-    this.swingT = 0;
-    this.pendingSwing = null;
     this.walkPhase = 0;
-    this.flash = 0;
-    this.lastHitBy = null;
-    this.model.root.visible = true;
+    this.local = false;
   }
 
-  get item() {
-    return this.selected === 0 ? null : this.slots[this.selected - 1];
-  }
-
-  get weapon() {
-    const it = this.item;
-    return it && it.kind === 'weapon' ? it : null;
-  }
-
-  hitboxes() {
-    const p = this.pos;
-    if (this.state === 'skydive' || this.state === 'glide') {
-      return { body: { min: { x: p.x - 0.6, y: p.y + 0.3, z: p.z - 0.6 }, max: { x: p.x + 0.6, y: p.y + 1.5, z: p.z + 0.6 } }, head: null };
-    }
-    return {
-      body: { min: { x: p.x - 0.42, y: p.y, z: p.z - 0.42 }, max: { x: p.x + 0.42, y: p.y + 1.48, z: p.z + 0.42 } },
-      head: { min: { x: p.x - 0.26, y: p.y + 1.48, z: p.z - 0.26 }, max: { x: p.x + 0.26, y: p.y + 1.98, z: p.z + 0.26 } },
-    };
-  }
-
-  // Add an item. Returns whatever could not be taken (or null).
-  give(item) {
-    if (item.kind === 'ammo') {
-      const max = AMMO[item.type].max;
-      this.ammo[item.type] = Math.min(max, this.ammo[item.type] + item.count);
-      return null;
-    }
-    if (item.kind === 'mat') {
-      this.mats[item.type] = Math.min(MAX_MATS, this.mats[item.type] + item.count);
-      return null;
-    }
-    if (item.kind === 'consumable') {
-      const spec = CONSUMABLES[item.type];
-      let left = item.count;
-      for (const s of this.slots) {
-        if (s && s.kind === 'consumable' && s.type === item.type && s.count < spec.stack) {
-          const n = Math.min(left, spec.stack - s.count);
-          s.count += n;
-          left -= n;
-          if (!left) return null;
-        }
-      }
-      const empty = this.slots.indexOf(null);
-      if (empty >= 0) {
-        this.slots[empty] = { ...item, count: Math.min(left, spec.stack) };
-        left -= Math.min(left, spec.stack);
-        return left > 0 ? { ...item, count: left } : null;
-      }
-      return { ...item, count: left };
-    }
-    const empty = this.slots.indexOf(null);
-    if (empty >= 0) {
-      this.slots[empty] = item;
-      return null;
-    }
-    return item;
-  }
-
-  hasRoomFor(item) {
-    if (item.kind === 'ammo' || item.kind === 'mat') return true;
-    if (this.slots.includes(null)) return true;
-    if (item.kind === 'consumable') {
-      const spec = CONSUMABLES[item.type];
-      return this.slots.some((s) => s && s.kind === 'consumable' && s.type === item.type && s.count < spec.stack);
-    }
-    return false;
-  }
-
-  select(i) {
-    if (i === this.selected) return;
-    this.selected = i;
-    this.reloadT = 0;
-    this.heal = null;
-    this.fireCd = Math.max(this.fireCd, 0.25); // equip time
-  }
-
-  // Everything this fighter drops when eliminated.
-  dropAll() {
-    const out = [];
-    for (const s of this.slots) if (s) out.push(s);
-    for (const [k, v] of Object.entries(this.ammo)) if (v > 0) out.push({ kind: 'ammo', type: k, count: v });
-    for (const [k, v] of Object.entries(this.mats)) if (v > 0) out.push({ kind: 'mat', type: k, count: v });
-    this.slots = [null, null, null, null, null];
-    this.ammo = { light: 0, medium: 0, heavy: 0, shells: 0, rockets: 0 };
-    this.mats = { wood: 0, brick: 0, metal: 0 };
-    return out;
-  }
-
-  updateModel(dt, time) {
+  // alpha is how far we are between the previous and current sim tick.
+  update(dt, time, alpha) {
+    const f = this.f;
     const m = this.model;
-    m.root.position.copy(this.pos);
-    m.root.rotation.y = this.yaw;
+    m.root.visible = f.alive && f.state !== 'bus' && !(this.local && f.scoped);
+    if (!m.root.visible) return;
+    const x = f.prev.x + (f.pos.x - f.prev.x) * alpha;
+    const y = f.prev.y + (f.pos.y - f.prev.y) * alpha;
+    const z = f.prev.z + (f.pos.z - f.prev.z) * alpha;
+    m.root.position.set(x, y, z);
+    m.root.rotation.y = f.yaw;
+    this.pose(dt, time);
+  }
+
+  pose(dt, time) {
+    const f = this.f;
+    const m = this.model;
 
     // What's in hand.
-    const w = this.weapon;
-    let heldKey = w ? `${w.type}:${w.rarity}` : (this.selected === 0 ? 'pick' : (this.item ? 'item' : ''));
-    if (this.state === 'skydive' || this.state === 'glide' || this.state === 'bus') heldKey = '';
+    const w = f.weapon;
+    let heldKey = w ? `${w.type}:${w.rarity}` : (f.selected === 0 ? 'pick' : (f.item ? 'item' : ''));
+    if (f.state === 'skydive' || f.state === 'glide' || f.state === 'bus') heldKey = '';
     if (heldKey !== m.heldKey) {
       if (m.held) m.hand.remove(m.held);
       m.held = null;
       if (heldKey === 'pick') m.held = pickaxeMesh();
       else if (w && heldKey) m.held = gunMesh(w.type, w.rarity);
       else if (heldKey === 'item') {
-        const it = this.item;
+        const it = f.item;
         m.held = box(0.22, 0.22, 0.22, it.type === 'bandage' ? '#f5f5f5' : it.type === 'medkit' ? '#e74c3c' : it.type === 'chug' ? '#3fa6f2' : '#4aa3ff');
       }
       if (m.held) {
@@ -382,13 +263,12 @@ export class Fighter {
       }
       m.heldKey = heldKey;
     }
-    
-    const speed = Math.hypot(this.vel.x, this.vel.z);
-    m.glider.visible = this.state === 'glide';
+    const speed = Math.hypot(f.vel.x, f.vel.z);
+    m.glider.visible = f.state === 'glide';
     m.body.rotation.x = 0;
     m.body.position.y = 0;
 
-    if (this.state === 'skydive') {
+    if (f.state === 'skydive') {
       m.body.rotation.x = -1.25;
       m.body.position.y = 1.0;
       m.armL.rotation.set(0, 0, 1.4 + Math.sin(time * 8) * 0.1);
@@ -396,28 +276,28 @@ export class Fighter {
       m.legL.rotation.x = 0.3; m.legR.rotation.x = 0.4;
       return;
     }
-    if (this.state === 'glide') {
+    if (f.state === 'glide') {
       m.armL.rotation.set(0, 0, 2.6);
       m.armR.rotation.set(0, 0, -2.6);
       m.legL.rotation.x = 0.15; m.legR.rotation.x = -0.1;
       return;
     }
 
-    if (speed > 0.5 && this.onGround) this.walkPhase += dt * speed * 1.6;
+    if (speed > 0.5 && f.onGround) this.walkPhase += dt * speed * 1.6;
     else this.walkPhase *= 0.9;
     const s = Math.sin(this.walkPhase) * Math.min(1, speed / 5);
     m.legL.rotation.x = s * 0.7;
     m.legR.rotation.x = -s * 0.7;
-    if (!this.onGround && !this.swimming) { m.legL.rotation.x = -0.5; m.legR.rotation.x = 0.3; }
+    if (!f.onGround && !f.swimming) { m.legL.rotation.x = -0.5; m.legR.rotation.x = 0.3; }
 
     // Arms: aim the gun along pitch, or swing the pickaxe.
     m.armL.rotation.set(0, 0, 0);
     m.armR.rotation.set(0, 0, 0);
     m.hips.rotation.set(0, 0, 0);
-    if (this.selected === 0) {
-      if (this.swingT > 0) {
+    if (f.selected === 0) {
+      if (f.swingT > 0) {
         // Wind up over the shoulder, chop down hard, then recover.
-        const t = 1 - this.swingT / 0.42;
+        const t = 1 - f.swingT / 0.42;
         const ease = (a, b, k) => a + (b - a) * (k * k * (3 - 2 * k));
         let arm, twist, lean;
         if (t < 0.3) { const k = t / 0.3; arm = ease(0.7, 3.3, k); twist = ease(0, 0.4, k); lean = ease(0, -0.12, k); }
@@ -433,15 +313,15 @@ export class Fighter {
         m.armL.rotation.x = -s * 0.5;
       }
     } else {
-      const aim = Math.PI / 2 + this.pitch;
+      const aim = Math.PI / 2 + f.pitch;
       m.armR.rotation.x = aim;
       m.armL.rotation.x = aim;
       m.armL.rotation.z = -0.5;
     }
-    m.head.rotation.x = this.pitch * 0.5;
+    m.head.rotation.x = f.pitch * 0.5;
   }
 
-  remove() {
+  dispose() {
     this.scene.remove(this.model.root);
   }
 }

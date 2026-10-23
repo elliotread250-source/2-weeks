@@ -1,10 +1,18 @@
 # Architecture
 
-Status: Phase 0 plan. Nothing below the "Current state" section exists yet. Update this file at the end of every phase.
+Status: Phase 1 done (sim split from renderer). Later phases below are still plans. Update this file at the end of every phase.
 
-## Current state (verified 2026-10-23)
+## Current state (end of Phase 1)
 
-Single player, client only. `server.js` is a zero-dependency static server (`/public`, `/vendor/three/*` from node_modules, `/health`). No build step. three.js 0.170.0, import map in `public/index.html`.
+The simulation lives in `/shared` and runs headless in Node (a 6 minute 25-bot match simulates in about 2 seconds). The browser client wraps it in a `LocalHost` (fixed 30 Hz tick, render interpolation) and draws it. `server.js` is an ESM zero-dependency static server (`/public`, `/shared`, `/vendor/three/*`, `/health`). No build step. three.js 0.170.0 is served from node_modules, import map in `public/index.html`.
+
+How the pieces talk:
+1. The client samples input once per tick into a command struct (`shared/sim/controller.js`: held bitmask, edge-event bitmask, move axes, yaw/pitch, slot, piece, material step).
+2. `Match.tick()` applies commands to humans, runs bot brains, then physics, combat, loot, storm, builds, world.
+3. Everything the outside needs leaves as events (`match.takeEvents()`): sounds, particles, HUD messages, hits, build/loot/world changes. The client routes them in `client/game.js`. The sim never imports a renderer.
+4. The world is generated from a seed (`MAP_SEED`) in `shared/sim/world.js` + `pois.js` + `decor.js`. Server and every client build identical data, so none of it crosses the network. Tests check byte-identical digests.
+
+Known deviations from the master prompt, to fix later: bots drive their fighter directly instead of emitting command structs (they use the same combat and build rules); the sim runs on the main thread, not a Web Worker; `Fighter` ids come from a module counter (fine per process, must be per-room for the server).
 
 Hosting: Railway project `arcade` (id f845a1d7-7352-4c4f-82c7-9beb054468a6), service `two-weeks`, production environment, source repo `elliotread250-source/2-weeks`. Live URL: https://two-weeks-production.up.railway.app. Deploys branch `claude/intelligent-heisenberg-y496j2` (commit 1325fdb). No env vars set. The same project already has a `Postgres` service (shared with the other arcade games), so Phase 3 should add a separate database inside it or a new Postgres service, not reuse the arcade tables.
 

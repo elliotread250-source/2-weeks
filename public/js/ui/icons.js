@@ -1,6 +1,6 @@
 // Item icons as SVG path data on a 64x32 grid. The HUD renders them as inline
 // SVG; the 3D loot cards draw the same paths onto a canvas with Path2D.
-import { RARITIES, CONSUMABLES } from './config.js';
+import { RARITIES, CONSUMABLES } from '/shared/config.js';
 
 const W = '#ffffff';
 
