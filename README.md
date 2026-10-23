@@ -19,9 +19,24 @@ npm test                 # node:test suite for the simulation
 node tools/smoke.mjs     # headless-browser smoke test (add --deep for a scripted match)
 ```
 
+## Online play
+
+PLAY ONLINE joins a room on the same server (`/ws` on the HTTP port). Rooms hold 32 fighters; humans queue in a lobby and bots fill the rest when it is full or the 60 second timer ends. Disconnect and the server keeps your fighter for 30 seconds (10 of them invulnerable); reloading the page resumes it.
+
+| Env var | Default | Meaning |
+| --- | --- | --- |
+| `PORT` | 3000 | HTTP and WebSocket port (Railway sets it) |
+| `MAX_PLAYERS_PER_ROOM` | 32 | humans plus bots per match |
+| `LOBBY_SECONDS` | 60 | how long a lobby waits before bots fill it |
+| `HUMAN_TARGET` | room capacity | start immediately once this many humans joined |
+
+`/health` is the Railway health check. `/health/full` also lists live rooms with average and max tick time.
+
+Network tools: `node tools/netsim.mjs --listen 4000 --target ws://localhost:3000/ws --latency 150 --jitter 20 --loss 0.02` puts a laggy lossy proxy in front of the server; `node tools/soak.mjs 32 10` runs a headless 32-bot, 10 minute match and prints tick cost; `node tools/smoke-online.mjs` plays two headless browsers against each other.
+
 ## Code layout
 
-`shared/` is the whole game simulation with no rendering and no DOM, so it runs in Node and the browser. `public/js/` is the client: `render/` draws sim state, `client/` turns input into sim commands and sim events into visuals and sound, `ui/` is the HUD and menus. See ARCHITECTURE.md and PROGRESS.md.
+`server/` is the authoritative game server (rooms, matchmaking, rate limits). `shared/` is the whole game simulation with no rendering and no DOM, so it runs in Node and the browser. `public/js/` is the client: `render/` draws sim state, `client/` turns input into sim commands and sim events into visuals and sound, `ui/` is the HUD and menus. See ARCHITECTURE.md and PROGRESS.md.
 
 ## Controls
 

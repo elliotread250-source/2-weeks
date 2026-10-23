@@ -16,7 +16,7 @@ export const ACT = {
 export const PIECES = ['wall', 'floor', 'ramp', 'cone'];
 
 export function emptyCommand() {
-  return { seq: 0, mx: 0, mz: 0, yaw: 0, pitch: 0, held: 0, act: 0, slot: -1, slotStep: 0, piece: -1, matStep: 0 };
+  return { seq: 0, mx: 0, mz: 0, yaw: 0, pitch: 0, held: 0, act: 0, slot: -1, slotStep: 0, piece: -1, matStep: 0, viewTick: 0 };
 }
 
 const nextMat = (m, step = 1) => MAT_ORDER[(MAT_ORDER.indexOf(m) + step + MAT_ORDER.length) % MAT_ORDER.length];
@@ -39,10 +39,6 @@ export function applyCommand(match, f, cmd, dt) {
   }
 
   const airborne = f.airborne;
-  if (f.state === 'skydive' && act(ACT.JUMP)) {
-    const above = f.pos.y - match.collision.groundHeight(f.pos.x, f.pos.z, f.pos.y);
-    if (above < 110) { f.state = 'glide'; match.emit('sfx', { name: 'glider', by: f.id, own: true }); }
-  }
 
   // ---- mode switching
   if (!airborne) {
@@ -87,7 +83,30 @@ export function applyCommand(match, f, cmd, dt) {
   }
   if (act(ACT.RELOAD) && !f.buildMode) match.combat.tryReload(f);
 
-  // ---- movement
+  applyMovement(match, f, cmd, dt);
+
+  // ---- actions
+  f.buildCd -= dt;
+  if (f.editMode) updateEdit(match, f, cmd, act, held);
+  else if (f.buildMode) updateBuild(match, f, act, held);
+  else if (!airborne) updateCombat(match, f, cmd, act, held);
+  if (!airborne) updateInteract(match, f, act, held, dt);
+  else f.chestT = 0;
+}
+
+// Look, glider opening, velocity and jumping for one tick. Split out so the
+// client can replay it for prediction without touching combat or building.
+export function applyMovement(match, f, cmd, dt) {
+  const act = (b) => (cmd.act & b) !== 0;
+  const held = (b) => (cmd.held & b) !== 0;
+  f.yaw = cmd.yaw;
+  f.pitch = cmd.pitch;
+  if (!f.alive || f.state === 'bus') return;
+  const airborne = f.airborne;
+  if (f.state === 'skydive' && act(ACT.JUMP)) {
+    const above = f.pos.y - match.collision.groundHeight(f.pos.x, f.pos.z, f.pos.y);
+    if (above < 110) { f.state = 'glide'; match.emit('sfx', { name: 'glider', by: f.id, own: true }); }
+  }
   const fwd = new Vec3(-Math.sin(cmd.yaw), 0, -Math.cos(cmd.yaw));
   const right = new Vec3(Math.cos(cmd.yaw), 0, -Math.sin(cmd.yaw));
   const wish = new Vec3().addScaledVector(fwd, cmd.mz).addScaledVector(right, cmd.mx);
@@ -117,14 +136,6 @@ export function applyCommand(match, f, cmd, dt) {
       f.onGround = false;
     }
   }
-
-  // ---- actions
-  f.buildCd -= dt;
-  if (f.editMode) updateEdit(match, f, cmd, act, held);
-  else if (f.buildMode) updateBuild(match, f, act, held);
-  else if (!airborne) updateCombat(match, f, act, held);
-  if (!airborne) updateInteract(match, f, act, held, dt);
-  else f.chestT = 0;
 }
 
 export function resetModes(match, f) {
@@ -132,7 +143,7 @@ export function resetModes(match, f) {
   f.resetControl();
 }
 
-function updateCombat(match, f, act, held) {
+function updateCombat(match, f, cmd, act, held) {
   const { origin, dir } = f.aimRay();
   if (f.selected === 0) {
     if (held(HELD.FIRE)) match.combat.swing(f, origin, dir);
@@ -143,7 +154,7 @@ function updateCombat(match, f, act, held) {
   if (it.kind === 'weapon') {
     const spec = WEAPONS[it.type];
     if ((spec.auto && held(HELD.FIRE)) || act(ACT.FIRE)) {
-      match.combat.fire(f, origin, dir, { ads: f.ads, firstShotAccurate: true });
+      match.combat.fire(f, origin, dir, { ads: f.ads, firstShotAccurate: true, rewindTick: cmd.viewTick });
     }
   } else if (it.kind === 'consumable' && act(ACT.FIRE)) {
     if (!match.combat.startHeal(f)) match.emit('message', { to: f.id, text: '', sub: "You can't use that right now", dur: 1.2 });

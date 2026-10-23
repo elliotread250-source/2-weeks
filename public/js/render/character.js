@@ -230,11 +230,11 @@ export class FighterView {
   update(dt, time, alpha) {
     const f = this.f;
     const m = this.model;
-    m.root.visible = f.alive && f.state !== 'bus' && !(this.local && f.scoped);
+    m.root.visible = f.alive && !f.hidden && f.state !== 'bus' && !(this.local && f.scoped);
     if (!m.root.visible) return;
-    const x = f.prev.x + (f.pos.x - f.prev.x) * alpha;
-    const y = f.prev.y + (f.pos.y - f.prev.y) * alpha;
-    const z = f.prev.z + (f.pos.z - f.prev.z) * alpha;
+    const x = f.prev.x + (f.pos.x - f.prev.x) * alpha + f.smooth.x;
+    const y = f.prev.y + (f.pos.y - f.prev.y) * alpha + f.smooth.y;
+    const z = f.prev.z + (f.pos.z - f.prev.z) * alpha + f.smooth.z;
     m.root.position.set(x, y, z);
     m.root.rotation.y = f.yaw;
     this.pose(dt, time);

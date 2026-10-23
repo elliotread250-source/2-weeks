@@ -174,6 +174,18 @@ export class CollisionWorld {
     body.swimming = overWater && newY <= swimLevel + 0.05;
   }
 
+  // Recompute body.groundY for the body's current position, exactly as
+  // moveBody would have left it. The netcode calls this after loading a
+  // server position so replayed physics sees the same "height above ground".
+  refreshGround(body) {
+    const r = body.radius ?? PLAYER.radius;
+    const p = body.pos;
+    let ground = this.groundHeight(p.x, p.z, p.y + PLAYER.stepHeight, r * 0.7);
+    const swimLevel = WATER_LEVEL - 1.25;
+    if (ground < swimLevel) ground = swimLevel;
+    body.groundY = ground;
+  }
+
   ceilingAbove(x, z, fromY, radius) {
     let best = null;
     const list = this.query(x - radius, z - radius, x + radius, z + radius, scratch);

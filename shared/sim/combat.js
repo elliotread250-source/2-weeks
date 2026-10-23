@@ -41,13 +41,14 @@ export class Combat {
   }
 
   // Raycast the world and every fighter except `self`.
-  trace(origin, dir, range, self) {
+  trace(origin, dir, range, self, rewindTick = 0) {
     const world = this.col.raycast(origin, dir, range);
     let bestT = world ? world.t : range;
     let hitFighter = null, head = false;
     for (const f of this.m.fighters) {
       if (f === self || !f.alive || f.state === 'bus') continue;
-      const hb = f.hitboxes();
+      const past = rewindTick ? this.m.positionAt(f, rewindTick) : null;
+      const hb = past ? f.hitboxes(past, past.airborne) : f.hitboxes();
       const hh = hb.head ? rayBox(origin, dir, hb.head, bestT) : null;
       if (hh && hh.t < bestT) { bestT = hh.t; hitFighter = f; head = true; }
       const hbody = rayBox(origin, dir, hb.body, bestT);
@@ -139,7 +140,7 @@ export class Combat {
     const dealt = new Map();
     for (let i = 0; i < spec.pellets; i++) {
       const d = this.spreadDir(dir, spread);
-      const hit = this.trace(origin, d, spec.range, f);
+      const hit = this.trace(origin, d, spec.range, f, opts.rewindTick);
       if (i < 3 || spec.pellets === 1) this.m.emit('tracer', { from: muzzle, to: hit.point });
       if (hit.fighter) {
         const dmg = per * (hit.head ? spec.headMult : 1) * falloff(w.type, hit.t);
@@ -333,6 +334,7 @@ export class Combat {
   applyDamage(target, amount, source, opts = {}) {
     if (!target.alive || amount <= 0) return;
     if (this.m.phase === 'over') return;
+    if (target.invulnUntil > this.m.time) return;
     let toShield = 0, toHealth = 0;
     if (opts.storm) {
       toHealth = amount;

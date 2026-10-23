@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RARITIES, PICKAXE, INTERACT, WEAPONS } from '/shared/config.js';
 import { GAME } from '/shared/names.js';
 import { itemName } from '/shared/sim/loot.js';
-import { interactTarget } from '/shared/sim/controller.js';
+import { interactTarget, emptyCommand } from '/shared/sim/controller.js';
 import { pieceAABB } from '/shared/sim/building.js';
 import { WorldView } from '../render/world.js';
 import { BuildView } from '../render/builds.js';
@@ -119,7 +119,7 @@ export class Game {
     this.sun = sun;
 
     // The match runs in this tab; the client only sees `match` as read-only state.
-    this.host = new LocalHost({ botCount: opts.botCount });
+    this.host = opts.host || new LocalHost({ botCount: opts.botCount });
     this.match = this.host.match;
     this.player = this.host.local;
 
@@ -187,7 +187,17 @@ export class Game {
     requestAnimationFrame(this.loop);
     const dt = Math.min(0.05, this.clock.getDelta());
     if (!this.paused) this.frame(dt);
+    else if (this.host.online) this.pausedOnline(dt);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // The server keeps simulating while the pause menu is open, so keep sending
+  // neutral commands instead of letting it repeat the last held keys.
+  pausedOnline(dt) {
+    const { events } = this.host.step(dt, () => ({
+      ...emptyCommand(), yaw: this.input.yaw, pitch: this.input.pitch,
+    }));
+    this.dispatch(events);
   }
 
   // ------------------------------------------------------------ frame
@@ -204,9 +214,9 @@ export class Game {
     if (this.spectate && !this.spectate.alive) this.spectate = m.fighters.find((f) => f.alive && !f.human) || null;
 
     const lp = {
-      x: p.prev.x + (p.pos.x - p.prev.x) * alpha,
-      y: p.prev.y + (p.pos.y - p.prev.y) * alpha,
-      z: p.prev.z + (p.pos.z - p.prev.z) * alpha,
+      x: p.prev.x + (p.pos.x - p.prev.x) * alpha + p.smooth.x,
+      y: p.prev.y + (p.pos.y - p.prev.y) * alpha + p.smooth.y,
+      z: p.prev.z + (p.pos.z - p.prev.z) * alpha + p.smooth.z,
     };
     for (const v of this.views.values()) v.update(dt, this.time, alpha);
     this.cameraRig.update(p, lp, this.input.yaw, this.input.pitch, { match: m, spectate: this.spectate });
@@ -332,6 +342,7 @@ export class Game {
   }
 
   onStaticShatter(el, mode) {
+    if (mode === 'init') return; // already broken before we joined
     const n = this.match.world.brokenThisTick;
     if (n < 40) this.fx.shatter(el.min, el.max, el.hex || '#bbbbbb', { fall: mode === 'fall' });
     if (n < 3) {
@@ -341,6 +352,12 @@ export class Game {
   }
 
   onBuildDestroyed(p, mode, mat) {
+    if (mode === 'quiet') return; // swapped for the server's copy
+    if (mode === 'fizz') {
+      const bb = pieceAABB(p);
+      this.fx.burst({ x: (bb.min[0] + bb.max[0]) / 2, y: (bb.min[1] + bb.max[1]) / 2, z: (bb.min[2] + bb.max[2]) / 2 }, '#9ad0ec', 8, 3, 0.8);
+      return;
+    }
     const bb = pieceAABB(p);
     const min = { x: bb.min[0], y: bb.min[1], z: bb.min[2] }, max = { x: bb.max[0], y: bb.max[1], z: bb.max[2] };
     this.fx.shatter(min, max, mat, { fall: mode === 'fall' });

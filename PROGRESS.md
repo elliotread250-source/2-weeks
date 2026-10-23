@@ -28,9 +28,24 @@ Not done / deferred:
 - No Web Worker for the sim.
 - Build "edit" is exercised only lightly in the deep smoke test; do a hands-on pass once a real GPU browser is available.
 
-## Next: Phase 2 (online netcode)
+## Phase 2: online multiplayer (done 2026-10-23)
 
-Not started. Needs `ws`, `server/` rooms, binary protocol, prediction, interpolation, lag compensation, anti-cheat, netsim and soak tests.
+Done:
+- `server/` (rooms, matchmaker, rate limits), `shared/net/` (binary protocol, wire events), `public/js/client/nethost.js` (replica match, prediction, reconcile, interpolation, predicted building).
+- PLAY ONLINE in the lobby with a name box and queue status. Sessions resume for 30 seconds. `/health/full` reports rooms and tick times.
+- Lag compensation (server rewinds up to 200 ms), command budget against speed hacks, sanitising, kicks.
+- Tools: `tools/netsim.mjs` (latency, jitter, loss proxy), `tools/soak.mjs`, `tools/smoke-online.mjs`.
+- Tests: 43 total. Protocol round trips, real WebSocket rooms, flood kick, resume, speed-hack bound, lag compensation, deterministic reconcile, and the real client against the real server through the lossy proxy at 50/150/250 ms.
+
+Not done / to check:
+- Not yet exercised on Railway (the sandbox cannot reach railway.app). First thing to do next session: open the live URL in two tabs and press PLAY ONLINE.
+- Edits are not predicted (placement is). Spectating follows the killer but has no UI to cycle yet.
+- A room starts with whoever is in the lobby; nobody can join a match in progress except by resuming.
+- Party codes are Phase 6 or later.
+
+## Next: Phase 3 (accounts and the database)
+
+Not started.
 
 ## Known bugs
 
