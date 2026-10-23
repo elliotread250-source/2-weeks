@@ -76,9 +76,10 @@ export class LootSystem {
     return c;
   }
 
-  openChest(c) {
+  openChest(c, by = null) {
     if (c.opened) return;
     c.opened = true;
+    if (by && by.stats && c.type === 'chest') by.stats.chests++;
     const r = this.rng;
     const p = c.pos.clone().add(new Vec3(0, 0.6, 0));
     if (c.type === 'chest') {

@@ -2,6 +2,8 @@
 // keeps coins, items and stats. If the server's database is down the widget
 // says so instead of failing silently.
 
+import { toast } from './toast.js';
+
 const $ = (s) => document.querySelector(s);
 
 export const account = { profile: null, down: false, listeners: [] };
@@ -33,6 +35,7 @@ export async function refreshAccount() {
     const { status, data } = await api('/api/me');
     account.down = status === 503;
     account.profile = data.guest || account.down ? null : data;
+    if (account.profile && data.dailyLogin > 0) toast(`Daily login: +${data.dailyLogin} Coins`, 'good');
   } catch {
     account.down = false; // offline or no server: just a guest
     account.profile = null;
@@ -77,6 +80,8 @@ export function initAccount() {
       $('#auth').classList.add('hidden');
       $('#auth-pin').value = '';
       render();
+      refreshAccount(); // collects the daily login bonus
+
     } else {
       $('#auth-error').textContent = data.error || 'Something went wrong';
     }

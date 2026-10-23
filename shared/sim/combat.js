@@ -275,6 +275,7 @@ export class Combat {
       const el = c.owner;
       const gained = 6;
       f.mats[el.mat] = Math.min(MAX_MATS, f.mats[el.mat] + gained);
+      f.stats.harvested += gained;
       burst(STATIC_SPARK[el.mat], 5, 3);
       this.structNumber(f, hit.point, PICKAXE.structureDamage);
       this.m.world.damageStatic(el, PICKAXE.structureDamage, this.rng);
@@ -285,6 +286,7 @@ export class Combat {
         const crit = !!(h.weak && Math.hypot(h.weak.pos.x - hit.point.x, h.weak.pos.y - hit.point.y, h.weak.pos.z - hit.point.z) < 0.5);
         const gained = this.m.world.hitHarvestable(h, hit.point, hit.normal, crit, this.rng);
         f.mats[h.mat] = Math.min(MAX_MATS, f.mats[h.mat] + gained);
+        f.stats.harvested += gained;
         burst(h.mat === 'wood' ? '#a0703f' : h.mat === 'brick' ? '#9e9e9e' : '#b0bec5', crit ? 8 : 4, 3);
         this.structNumber(f, hit.point, crit ? 100 : 50, crit);
         if (crit) this.m.emit('sfx', { name: 'crit', by: f.id, own: true });
@@ -361,7 +363,11 @@ export class Combat {
     }
     if (source && source !== target) {
       target.lastHitBy = { f: source, t: this.m.time };
-      if (!opts.storm) source.damageDealt += toShield + toHealth;
+      if (!opts.storm) {
+        source.damageDealt += toShield + toHealth;
+        target.contrib.set(source.id, (target.contrib.get(source.id) || 0) + toShield + toHealth);
+        if (opts.head) source.stats.headshots++;
+      }
     }
 
     const pt = opts.point || target.pos.clone().add(new Vec3(0, 1.8, 0));

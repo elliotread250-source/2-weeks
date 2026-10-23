@@ -1,9 +1,14 @@
 // Entry point: lobby, settings/keybinds screen, then the match.
 import { Game } from '../client/game.js';
 import { NetHost } from '../client/nethost.js';
-import { initAccount, account } from './account.js';
+import { initAccount, account, refreshAccount } from './account.js';
+import { matchReward } from '/shared/economy/economy.js';
 import { currentLoadout, refreshLoadout } from '../client/loadout.js';
 import { initLocker } from './locker.js';
+import { initShop } from './shop.js';
+import { initChallenges } from './challenges.js';
+import { toast } from './toast.js';
+import { renderRewards } from './rewards.js';
 import { initAudio } from '../audio/audio.js';
 import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from '../client/binds.js';
 
@@ -124,9 +129,26 @@ $('#settings-close').addEventListener('click', closeSettings);
 
 // ---------------------------------------------------------------- match
 
+// End-of-match coins. Online payouts arrive from the server as a `reward`
+// message (see playOnline); offline results are reported for a capped payout.
+async function onMatchEnd(summary, online) {
+  const el = $('#end-rewards');
+  if (!account.profile) {
+    const r = matchReward(summary, !online);
+    renderRewards(el, null, { guest: true, estimate: { parts: r.parts, total: r.total } });
+    return;
+  }
+  if (online) return;
+  try {
+    const r = await fetch('/api/offline-result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(summary) });
+    const j = await r.json();
+    if (r.ok) { renderRewards(el, j); refreshAccount(); } else toast(j.error || 'Could not save your result', 'bad');
+  } catch { /* offline: the result is simply not paid */ }
+}
+
 function launch(opts) {
   try {
-    game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high', loadout: currentLoadout(), name: $('#player-name').value.trim() || undefined, ...opts });
+    game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high', loadout: currentLoadout(), onEnd: onMatchEnd, name: $('#player-name').value.trim() || undefined, ...opts });
     window.__game = game;
     $('#lobby').classList.add('hidden');
     $('#loading').classList.remove('show');
@@ -167,6 +189,11 @@ async function playOnline(resumeToken = null) {
       $('#loading').classList.add('show');
       setTimeout(() => location.reload(), 2000);
     };
+    host.onReward = (r) => {
+      renderRewards($('#end-rewards'), r);
+      for (const c of r.challenges || []) toast(`Challenge complete: ${c.text} (+${c.coins})`, 'good');
+      refreshAccount();
+    };
     status.textContent = 'Match found!';
     $('#loading').classList.add('show');
     setTimeout(() => launch({ host }), 50);
@@ -195,3 +222,5 @@ account.listeners.push(refreshLoadout);
 initAccount();
 refreshLoadout();
 initLocker();
+initShop();
+initChallenges();

@@ -287,3 +287,37 @@ button.small { font-size: 16px; padding: 8px 18px; }
 .sw { padding: 0; }
 .tile { padding: 4px; }
 #locker-grid .tile { width: auto; }
+
+/* ---------------- shop, challenges, toasts, rewards ---------------- */
+.panel-screen { position: fixed; inset: 0; z-index: 75; background: linear-gradient(#0d1c4a, #060d26); display: flex; flex-direction: column; padding: 14px 18px; gap: 10px; overflow-y: auto; }
+.panel-screen .locker-head { gap: 16px; }
+#shop-coins { margin-left: auto; font: 700 22px Oswald, sans-serif; color: var(--yellow); }
+#shop-body, #chal-body { max-width: 980px; width: 100%; margin: 0 auto; }
+#shop-body h3, #chal-body h3 { font-family: 'Luckiest Guy', sans-serif; font-weight: normal; color: var(--yellow); font-size: 24px; margin: 14px 0 8px; }
+#chal-body h3 small { font: 500 14px Oswald, sans-serif; color: #9db8e8; margin-left: 8px; }
+.shop-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.shop-row.big { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.shop-row .tile { height: 190px; }
+.shop-row.big .tile { height: 240px; }
+.shop-row .tile img { width: 120px; height: 120px; }
+.shop-row.big .tile img { width: 160px; height: 160px; }
+.shop-row .tile i { font-size: 16px; top: 6px; right: 8px; }
+.tile.confirm { outline: 3px solid var(--yellow); }
+.shop-msg { font: 600 18px Oswald, sans-serif; color: #cfe3ff; text-align: center; margin-top: 60px; }
+.chal-row { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.07); border-radius: 6px; padding: 10px 14px; margin-bottom: 6px; }
+.chal-row.done { opacity: .55; }
+.chal-text { flex: 1; font: 600 17px Oswald, sans-serif; }
+.chal-text .bar { height: 8px; background: rgba(0,0,0,.45); border-radius: 4px; margin: 6px 0 2px; overflow: hidden; }
+.chal-text .bar i { display: block; height: 100%; background: var(--yellow); }
+.chal-text small { color: #9db8e8; font: 500 13px Oswald, sans-serif; }
+.chal-reward { font: 700 20px Oswald, sans-serif; color: var(--yellow); text-align: right; }
+.chal-reward small { display: block; font-size: 11px; color: #cfe3ff; }
+#toasts { position: fixed; right: 16px; top: 16px; z-index: 120; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { background: rgba(10,20,45,.92); border-left: 4px solid var(--blue); padding: 10px 16px; font: 600 16px Oswald, sans-serif; border-radius: 4px; animation: toastin .25s ease-out; transition: opacity .5s; }
+.toast.good { border-color: #5cd65c; } .toast.bad { border-color: #ff7070; } .toast.out { opacity: 0; }
+@keyframes toastin { from { transform: translateX(40px); opacity: 0; } }
+#end-rewards .rw-box { background: rgba(0,0,0,.5); border: 2px solid #fff3; border-radius: 8px; padding: 10px 24px; min-width: 260px; font: 600 17px Oswald, sans-serif; }
+#end-rewards h4 { margin: 0 0 6px; font-family: 'Luckiest Guy', sans-serif; font-weight: normal; font-size: 30px; color: var(--yellow); text-align: center; }
+#end-rewards .rw-box > div { display: flex; justify-content: space-between; gap: 30px; }
+#end-rewards .chal b, #end-rewards .chal span { color: #8cf08c; }
+#end-rewards .hint { margin: 6px 0 0; text-align: center; color: #cfe3ff; font-size: 14px; }

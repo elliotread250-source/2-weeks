@@ -141,7 +141,15 @@ export class Room {
     }
     if (m.phase === 'over' && !this.overAt) {
       this.overAt = now;
-      if (this.db) recordMatch(this.db, this).catch((e) => console.error('[results]', e.message));
+      if (this.db) {
+        recordMatch(this.db, this).then(() => {
+          // Tell each signed-in player what the match paid and which challenges it finished.
+          for (const c of this.clients.values()) {
+            const r = this.rewards && this.rewards.get(c.userId);
+            if (r && c.connected) c.sendText(JSON.stringify({ t: 'reward', ...r }));
+          }
+        }).catch((e) => console.error('[results]', e.message));
+      }
     }
     if (this.overAt && now - this.overAt > 8000) this.close();
   }

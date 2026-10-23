@@ -14,6 +14,7 @@ export async function recordMatch(db, room) {
         [room.mode, m.seed, humans, m.fighters.length - humans],
       );
       const matchId = Number(rows[0].id);
+      const rewards = new Map();
       for (const p of players) {
         const f = p.fighter;
         const survival = Math.round(f.diedAt || m.time);
@@ -26,7 +27,19 @@ export async function recordMatch(db, room) {
              kills = kills + $4, damage = damage + $5, time_alive_s = time_alive_s + $6 WHERE user_id = $1`,
           [p.userId, f.placement === 1 ? 1 : 0, f.placement <= 10 ? 1 : 0, f.kills, Math.round(f.damageDealt), survival],
         );
+        if (db.economy) {
+          const summary = {
+            placement: f.placement, total: m.fighters.length, kills: f.kills, assists: f.stats.assists, survivalS: survival,
+            survivalMin: Math.floor(survival / 60), damage: Math.round(f.damageDealt), headshots: f.stats.headshots,
+            chests: f.stats.chests, harvested: f.stats.harvested, built: f.stats.built,
+            matches: 1, wins: f.placement === 1 ? 1 : 0, top10: f.placement <= 10 ? 1 : 0,
+          };
+          const reward = await db.economy.rewardOnline(c, p.userId, summary, matchId);
+          await c.query('UPDATE match_players SET coins_earned = $3 WHERE match_id = $1 AND user_id = $2', [matchId, p.userId, reward.coins + reward.bonus]);
+          rewards.set(p.userId, reward);
+        }
       }
+      room.rewards = rewards;
       return matchId;
     });
   } catch (e) {
