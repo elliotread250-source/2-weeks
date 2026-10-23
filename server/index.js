@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws';
 import { decodeCommands, MSG } from '../shared/net/protocol.js';
 import { Matchmaker } from './matchmaker.js';
 import { RateLimiter, Violations, cleanName } from './limits.js';
+import { parseCookies } from './api.js';
 
 class Client {
   constructor(ws, ip) {
@@ -38,13 +39,15 @@ class Client {
 }
 
 export function attachGameServer(httpServer, opts = {}) {
-  const matchmaker = new Matchmaker(opts);
+  const matchmaker = new Matchmaker({ ...opts, db: opts.accounts ? opts.accounts.db : null });
   const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: 4096 });
 
   wss.on('connection', (ws, req) => {
     const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
     const client = new Client(ws, ip);
     ws.client = client;
+
+    client.cookie = parseCookies(req.headers.cookie).tw_session || null;
 
     ws.on('message', (data, isBinary) => {
       const c = ws.client;
@@ -56,7 +59,7 @@ export function attachGameServer(httpServer, opts = {}) {
           return;
         }
         if (!c.textLimit.take()) return c.violate('message flood');
-        handleText(c, JSON.parse(data.toString()));
+        handleText(c, JSON.parse(data.toString())).catch((err) => c.violate(`bad message (${err.message})`));
       } catch (err) {
         c.violate(`bad message (${err.message})`);
       }
@@ -69,13 +72,20 @@ export function attachGameServer(httpServer, opts = {}) {
     ws.on('error', () => {});
   });
 
-  function handleText(c, m) {
+  async function handleText(c, m) {
     switch (m.t) {
-      case 'join':
-        if (c.room) return;
+      case 'join': {
+        if (c.room || c.joining) return;
+        c.joining = true;
         c.name = cleanName(m.name, `Player${Math.floor(Math.random() * 900 + 100)}`);
-        matchmaker.join(c, m.mode === 'solo' ? 'solo' : 'solo');
+        // Signed-in players play under their account name and get results saved.
+        if (c.cookie && opts.accounts && opts.accounts.db.ready) {
+          const u = await opts.accounts.userForToken(c.cookie).catch(() => null);
+          if (u) { c.userId = Number(u.id); c.name = u.username; }
+        }
+        matchmaker.join(c, 'solo');
         break;
+      }
       case 'resume': {
         if (c.room || typeof m.token !== 'string') return;
         for (const room of matchmaker.rooms) {

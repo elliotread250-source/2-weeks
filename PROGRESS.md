@@ -43,7 +43,23 @@ Not done / to check:
 - A room starts with whoever is in the lobby; nobody can join a match in progress except by resuming.
 - Party codes are Phase 6 or later.
 
-## Next: Phase 3 (accounts and the database)
+## Phase 3: accounts and the database (done 2026-10-23)
+
+Done:
+- `server/db.js` (pg pool, numbered SQL migrations under an advisory lock, never throws, retries every 15 s), `server/migrations/001_init.sql` (users, sessions, wallets, coin_ledger, owned_items, loadouts, challenge_progress, matches, match_players, shop_rotations, stats), all in the `twoweeks` schema so the shared Railway Postgres is not polluted.
+- `server/accounts.js`: username + 6 to 12 digit PIN, scrypt with a per-user salt, HMAC-hashed session tokens (30 days), lockout after 8 bad PINs for 15 minutes, identical error for unknown user and wrong PIN. Coin ledger: every award or purchase is one transaction, idempotent on (user, reason, ref), wallet always equals the ledger (tested under concurrency and triple-click purchases).
+- `server/api.js`: `/api/register|login|logout|me`, httpOnly SameSite=Lax cookie (Secure over https), same-origin check, body limit, per-IP rate limits, 503 "Can't reach the server right now" when the DB is down.
+- `server/names-filter.js`: shape, slur filter that survives leetspeak, reserved staff words.
+- Online matches save results and career stats for signed-in players. WebSocket joins use the account name when the cookie is present.
+- Lobby account bar and sign-in/create dialog. Guests still play everything.
+- 60 tests pass (17 new, run against a real Postgres; skipped automatically without one).
+
+Not done / to check:
+- Not yet verified on Railway. Env vars set: DATABASE_URL (reference to the shared Postgres), SESSION_SECRET, NODE_ENV.
+- The end-of-match "make an account to keep your coins" prompt arrives with coins in Phase 6.
+- No password-upgrade path yet (brief calls it optional).
+
+## Next: Phase 4 (characters, rig and animation)
 
 Not started.
 

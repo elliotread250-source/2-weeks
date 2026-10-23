@@ -254,6 +254,7 @@ export class Match {
 
   eliminateForGood(f) {
     f.eliminated = true;
+    f.diedAt = this.time;
     f.placement = this.aliveCount() + 1;
     if (f.human) this.emit('placement', { id: f.id, placement: f.placement, kills: f.kills, won: false });
     this.checkOver();
@@ -270,6 +271,7 @@ export class Match {
     const left = this.fighters.filter((f) => !f.eliminated);
     if (left.length === 1 && left[0].human) {
       left[0].placement = 1;
+      left[0].diedAt = this.time;
       this.emit('placement', { id: left[0].id, placement: 1, kills: left[0].kills, won: true });
       this.end();
     }

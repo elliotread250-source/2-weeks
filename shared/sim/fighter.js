@@ -29,6 +29,8 @@ export class Fighter {
     this.height = PLAYER.height;
     this.reset();
     this.kills = 0;
+    this.damageDealt = 0;
+    this.diedAt = 0; // match time of final elimination (or the win)
     this.eliminated = false;
   }
 
