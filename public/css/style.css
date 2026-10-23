@@ -190,6 +190,10 @@ button.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none;
 #crosshair svg { position: absolute; left: -100px; top: -100px; width: 200px; height: 200px; overflow: visible; }
 
 /* ---------------- settings & keybinds ---------------- */
+.play-row { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.play-row input { font: 700 18px Oswald, sans-serif; padding: 14px 16px; border-radius: 10px; border: 3px solid #fff; background: rgba(0,0,0,.45); color: #fff; width: 200px; text-align: center; }
+#play-btn.alt { background: #3a4a8c; color: #fff; }
+#online-status { min-height: 26px; margin-top: 10px; font: 700 18px Oswald, sans-serif; color: #ffe94a; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
 .lobby-actions { margin-top: 18px; display: flex; justify-content: center; }
 button.small { font-size: 16px; padding: 8px 18px; }
 #settings { position: fixed; inset: 0; z-index: 70; background: rgba(5, 12, 40, .78); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px 16px; }

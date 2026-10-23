@@ -20,7 +20,7 @@ import { Fighter } from './fighter.js';
 import { BotBrain } from './bot.js';
 import { Combat } from './combat.js';
 import { Storm } from './storm.js';
-import { applyCommand, emptyCommand } from './controller.js';
+import { applyCommand } from './controller.js';
 import { OUTFITS } from '../cosmetics/outfits.js';
 
 export class Match {
@@ -35,7 +35,10 @@ export class Match {
     this.resurgence = opts.resurgence ?? true;
     this.stormTick = 0;
     this.mapDirty = [];
-    this.commands = new Map(); // fighter id -> latest command
+    this.inbox = new Map(); // fighter id -> commands waiting to be applied, oldest first
+    this.replica = !!opts.replica; // client mirror of a server match: never ticked, events come from the wire
+    this.keepHistory = !!opts.keepHistory; // server: remember positions for lag compensation
+    this.history = [];
     this.fighters = [];
 
     const emit = (type, data) => this.emit(type, data);
@@ -48,8 +51,15 @@ export class Match {
     this.combat = new Combat(this);
   }
 
+  // Sim-originated events. A replica never simulates, so it drops these and
+  // gets its events from the server through pushEvent().
   emit(type, data = {}) {
+    if (this.replica) return;
     if (type === 'staticBroken') this.mapDirty.push(data.el);
+    this.events.push({ type, ...data });
+  }
+
+  pushEvent(type, data = {}) {
     this.events.push({ type, ...data });
   }
 
@@ -64,7 +74,7 @@ export class Match {
   addHuman(name, outfit = OUTFITS[0]) {
     const f = new Fighter(name, outfit, { human: true });
     this.fighters.push(f);
-    this.commands.set(f.id, emptyCommand());
+    this.inbox.set(f.id, []);
     return f;
   }
 
@@ -77,8 +87,12 @@ export class Match {
     }
   }
 
+  // Each command is one tick of that player's own time: it is applied (with
+  // movement physics) exactly once, in order, whenever it arrives. A tick with
+  // no command leaves the player where they are, so the server never simulates
+  // time the client did not, and prediction replays the same steps.
   setCommand(fighterId, cmd) {
-    this.commands.set(fighterId, cmd);
+    this.inbox.get(fighterId).push(cmd);
   }
 
   get humans() {
@@ -86,6 +100,7 @@ export class Match {
   }
 
   aliveCount() {
+    if (this.replica && this.aliveOverride != null) return this.aliveOverride;
     return this.fighters.filter((f) => !f.eliminated).length;
   }
 
@@ -298,6 +313,7 @@ export class Match {
     for (const ch of this.loot.chests) {
       if (!near(ch.pos)) continue;
       ch.pos.y = this.collision.groundHeight(ch.pos.x, ch.pos.z, ch.pos.y + 0.2, 0.3);
+      ch.moved = true;
       this.emit('chestMoved', { c: ch });
     }
   }
@@ -313,10 +329,15 @@ export class Match {
     if (this.phase === 'bus') this.updateBus(dt);
 
     for (const f of this.fighters) {
-      if (f.human) applyCommand(this, f, this.commands.get(f.id), dt);
-      else if (f.brain && f.alive) f.brain.update(dt);
+      if (f.human) {
+        const q = this.inbox.get(f.id);
+        while (q.length) {
+          applyCommand(this, f, q.shift(), dt);
+          this.physics(f, dt);
+        }
+      } else if (f.brain && f.alive) f.brain.update(dt);
     }
-    for (const f of this.fighters) this.physics(f, dt);
+    for (const f of this.fighters) if (!f.human) this.physics(f, dt);
     this.combat.update(dt);
     this.autoPickup();
 
@@ -363,6 +384,26 @@ export class Match {
     this.world.update(this.time);
     this.builds.update(dt);
     this.loot.update(dt);
+    if (this.keepHistory) this.recordHistory();
+  }
+
+  // ------------------------------------------------------------ lag compensation
+
+  recordHistory() {
+    const snap = { tick: this.tickCount, at: new Map() };
+    for (const f of this.fighters) {
+      snap.at.set(f.id, { x: f.pos.x, y: f.pos.y, z: f.pos.z, airborne: f.airborne });
+    }
+    this.history.push(snap);
+    if (this.history.length > 30) this.history.shift(); // one second
+  }
+
+  // Where fighter f stood at `tick` (clamped to what we remember).
+  positionAt(f, tick) {
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      if (this.history[i].tick <= tick) return this.history[i].at.get(f.id) || null;
+    }
+    return null;
   }
 }
 

@@ -80,7 +80,7 @@
     <div class="lobby-bg"></div>
     <div class="lobby-content">
       <h1 class="logo">TWO WEEKS</h1>
-      <p class="tag">Build. Edit. Drop on Rebirth Island. Be the last one standing.</p>
+      <p class="tag">Build. Edit. Drop on the island. Be the last one standing.</p>
       <div class="lobby-cols">
         <div class="card controls">
           <h3>Controls</h3>
@@ -94,7 +94,12 @@
           <p><b class="accent">Resurgence:</b> like Rebirth Island, you redeploy after dying until the third storm circle starts. After that, it's for keeps.</p>
         </div>
       </div>
-      <button id="play-btn">PLAY</button>
+      <div class="play-row">
+        <input id="player-name" maxlength="16" placeholder="Your name" autocomplete="off" />
+        <button id="online-btn">PLAY ONLINE</button>
+        <button id="play-btn" class="alt">PLAY OFFLINE (VS BOTS)</button>
+      </div>
+      <div id="online-status"></div>
       <div class="lobby-actions">
         <button id="settings-btn" class="ghost">SETTINGS &amp; KEYBINDS</button>
       </div>

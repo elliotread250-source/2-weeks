@@ -23,6 +23,8 @@ export class Fighter {
     this.pos = new Vec3();
     this.vel = new Vec3();
     this.prev = { x: 0, y: 0, z: 0, yaw: 0 }; // last tick, for render interpolation
+    this.smooth = { x: 0, y: 0, z: 0 }; // client-only offset easing out prediction corrections
+    this.invulnUntil = 0; // match time; set while a disconnected player waits to reconnect
     this.radius = PLAYER.radius;
     this.height = PLAYER.height;
     this.reset();
@@ -102,9 +104,10 @@ export class Fighter {
     return { origin: cam.clone().addScaledVector(dir, t0), dir, camPos: cam };
   }
 
-  hitboxes() {
-    const p = this.pos;
-    if (this.airborne) {
+  // Hit volumes at `pos` (defaults to now). Lag compensation passes a past
+  // position and whether the fighter was airborne then.
+  hitboxes(p = this.pos, airborne = this.airborne) {
+    if (airborne) {
       return { body: { min: { x: p.x - 0.6, y: p.y + 0.3, z: p.z - 0.6 }, max: { x: p.x + 0.6, y: p.y + 1.5, z: p.z + 0.6 } }, head: null };
     }
     return {

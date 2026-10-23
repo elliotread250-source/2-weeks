@@ -5,6 +5,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { attachGameServer } from './server/index.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -44,10 +45,14 @@ function resolve(urlPath) {
   return { file, cache };
 }
 
-export const server = http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('ok');
+  }
+  if (req.url === '/health/full') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, ...game.matchmaker.stats(), db: 'not configured' }));
   }
   const hit = resolve(req.url);
   if (!hit) {
@@ -67,6 +72,11 @@ export const server = http.createServer((req, res) => {
     fs.createReadStream(hit.file).pipe(res);
   });
 });
+
+export { server };
+
+// The game server shares this HTTP server's port at /ws.
+export const game = attachGameServer(server);
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   server.listen(PORT, () => {

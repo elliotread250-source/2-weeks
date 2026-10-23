@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phase 1 done (sim split from renderer). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 and 2 done (sim split from renderer; online netcode). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -15,6 +15,28 @@ How the pieces talk:
 Known deviations from the master prompt, to fix later: bots drive their fighter directly instead of emitting command structs (they use the same combat and build rules); the sim runs on the main thread, not a Web Worker; `Fighter` ids come from a module counter (fine per process, must be per-room for the server).
 
 Hosting: Railway project `arcade` (id f845a1d7-7352-4c4f-82c7-9beb054468a6), service `two-weeks`, production environment, source repo `elliotread250-source/2-weeks`. Live URL: https://two-weeks-production.up.railway.app. Deploys branch `claude/intelligent-heisenberg-y496j2` (commit 1325fdb). No env vars set. The same project already has a `Postgres` service (shared with the other arcade games), so Phase 3 should add a separate database inside it or a new Postgres service, not reuse the arcade tables.
+
+## Netcode (Phase 2)
+
+Dependencies added: `ws` (WebSocket server; Node has no built-in one).
+
+Server (`server/`): one `Room` per match runs `shared/sim/match.js` at 30 Hz. `Matchmaker` fills lobbies, then bots top up the room unless the average tick is past 70% of budget. `index.js` attaches to the HTTP server at `/ws`.
+
+Per client:
+1. Commands (binary, 25 bytes each, up to 8 per packet) are queued. The server grants one command per tick plus a burst allowance of 8, so a client cannot run faster than real time. Each command is one tick of that player's own time: it is applied once, in order, with movement physics, and a tick with no command leaves the player where they are. That is what makes replay exact.
+2. Snapshots go out at 20 Hz, binary, delta-encoded: a fighter record is only sent if its quantised bytes changed since last sent to that client, with explicit removals. Interest radius 220 m (centred on the spectated player when dead). The owner's snapshot also carries a private block (inventory, ammo, materials, timers). Sizes: about 30 bytes per changed fighter.
+3. Events are JSON frames (`shared/net/wire.js`), filtered by recipient or position. Build, loot and world changes go to everyone, in order (WebSocket is TCP, so this is the reliable ordered stream).
+4. A joining or resuming client gets a welcome with the seed plus everything that changed since the seed (builds, live pickups, opened chests, destroyed map chunks).
+
+Client (`public/js/client/nethost.js`): builds a replica `Match` from the seed. The local fighter is predicted: movement is replayed from the commands the server has not acknowledged, on top of each snapshot's state; corrections under 2.5 m ease out over about 100 ms, bigger ones snap. Others render 100 ms in the past from buffered samples, extrapolating at most 250 ms. Placed pieces appear at once as predicted pieces and are swapped for the server's copy, or fizzle after 1.2 s.
+
+Lag compensation: commands carry the server tick the shooter was viewing; the server keeps one second of positions and rewinds hitboxes to that tick, never more than 200 ms back. Projectiles run on the server only.
+
+Anti-cheat (server): damage, ammo, fire rate, build range and cost are all computed in the sim, so a client can only send inputs. Commands are sanitised (axes clamped, bit masks masked, angles finite), consumption is rate-limited as above, messages are token-bucketed, repeated violations kick, names are cleaned. Honest limit: a client can still use legitimate inputs perfectly (aim bots); nothing here detects that.
+
+Deviations from the master prompt: commands go out at the tick rate (30 Hz) rather than 60 Hz, because the server consumes exactly one per tick; edits are not predicted, only placement.
+
+Measured (this sandbox, one core): a 32-bot, 10 minute match averages 0.2 ms per tick (0.6% of the 33 ms budget, p99 1 ms, max 11 ms), 104 MB RSS. Prediction error with a 2% loss proxy at 50, 150 and 250 ms RTT: mean under 1 cm, max 2 cm, no snaps. Railway numbers still to measure.
 
 ## Module map: where everything moves
 

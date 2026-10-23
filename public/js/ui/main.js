@@ -1,5 +1,6 @@
 // Entry point: lobby, settings/keybinds screen, then the match.
 import { Game } from '../client/game.js';
+import { NetHost } from '../client/nethost.js';
 import { initAudio } from '../audio/audio.js';
 import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from '../client/binds.js';
 
@@ -118,26 +119,70 @@ $('#settings-close').addEventListener('click', closeSettings);
 
 // ---------------------------------------------------------------- match
 
+function launch(opts) {
+  try {
+    game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high', ...opts });
+    window.__game = game;
+    $('#lobby').classList.add('hidden');
+    $('#loading').classList.remove('show');
+    game.start();
+  } catch (err) {
+    console.error(err);
+    $('#loading').textContent = `Failed to start: ${err.message}`;
+  }
+}
+
 $('#play-btn').addEventListener('click', () => {
   initAudio();
   $('#loading').classList.add('show');
   // Let the loading screen paint before the island builds.
-  setTimeout(() => {
-    try {
-      game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high' });
-      window.__game = game;
-      $('#lobby').classList.add('hidden');
-      $('#loading').classList.remove('show');
-      game.start();
-    } catch (err) {
-      console.error(err);
-      $('#loading').textContent = `Failed to start: ${err.message}`;
-    }
-  }, 50);
+  setTimeout(() => launch({}), 50);
 });
 
+// ---------------------------------------------------------------- online
+
+const TOKEN_KEY = 'twoweeks.resume';
+
+function wsUrl() {
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+}
+
+async function playOnline(resumeToken = null) {
+  initAudio();
+  const status = $('#online-status');
+  const name = $('#player-name').value.trim();
+  try { localStorage.setItem('twoweeks.name', name); } catch { /* private mode */ }
+  $('#online-btn').disabled = true;
+  try {
+    const host = await NetHost.connect(wsUrl(), { name, resumeToken, onStatus: (t) => { status.textContent = t; } });
+    try { sessionStorage.setItem(TOKEN_KEY, host.token); } catch { /* private mode */ }
+    host.onClosed = () => {
+      // Dropped mid-match: the server keeps our fighter for 30 s, so try to resume.
+      $('#loading').textContent = 'Connection lost. Reconnecting...';
+      $('#loading').classList.add('show');
+      setTimeout(() => location.reload(), 2000);
+    };
+    status.textContent = 'Match found!';
+    $('#loading').classList.add('show');
+    setTimeout(() => launch({ host }), 50);
+  } catch (err) {
+    status.textContent = err.message;
+    $('#online-btn').disabled = false;
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+  }
+}
+
+$('#online-btn').addEventListener('click', () => playOnline());
+try { $('#player-name').value = localStorage.getItem('twoweeks.name') || ''; } catch { /* private mode */ }
+{
+  let token = null;
+  try { token = sessionStorage.getItem(TOKEN_KEY); } catch { /* private mode */ }
+  if (token) playOnline(token);
+}
+
 $('#resume-btn').addEventListener('click', () => game && game.input.lock());
-$('#quit-btn').addEventListener('click', () => location.reload());
-$('#again-btn').addEventListener('click', () => location.reload());
+const leave = () => { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } location.reload(); };
+$('#quit-btn').addEventListener('click', leave);
+$('#again-btn').addEventListener('click', leave);
 
 renderControls();
