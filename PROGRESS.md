@@ -73,7 +73,21 @@ Not done / to check:
 - Visual polish was judged from software renders only. Gun models are still the old boxes (Phase 7).
 - 18k vertices per character is on the heavy side; revisit with the quality presets in Phase 10.
 
-## Next: Phase 5 (cosmetics, locker, skin customisation)
+## Phase 5: cosmetics, locker, skin customisation (done 2026-10-23)
+
+Done:
+- Catalog in `shared/cosmetics/` (68 outfits in 12 archetypes with styles and palette recolours, 31 back blings, 25 pickaxes, 20 gliders, 12 contrails, 20 weapon wraps, 25 emotes, 30 banners, 10 loading screens). Everything is drawn in code from small recipes; prices by rarity; some Rare+ items are challenge-only.
+- `sanitizeLoadout` checks ownership on both sides: signed-in loadouts live in Postgres (`POST /api/loadout`), guests keep free items in localStorage. The server uses the account loadout when it seats you in a match; bots get random loadouts.
+- Renderers: rig back blings, hair and outfit variants, pickaxe and glider meshes, weapon wraps, contrails, neon glow. Offscreen icon renderer with an IndexedDB cache.
+- Locker screen (LOCKER button in the lobby): slots, live 3D preview (drag to spin, scroll to zoom, hover to try an item or play an emote), rarity/owned/search filters, styles and colour swatches.
+- In-game emote wheel: hold B, move the mouse, release; a quick tap plays slot 1.
+- Tests: 87 pass. `tools/smoke-locker.mjs` drives the locker through real Chromium.
+
+Not done / to check:
+- Items you do not own cannot be bought yet (shop is Phase 6). Banners and loading screens are equippable and shown as icons only; they appear in the end-of-match card in Phase 11.
+- All visuals judged from software renders. The held pickaxe pose in the locker preview is rough.
+
+## Next: Phase 6 (coins, item shop, challenges)
 
 Not started.
 

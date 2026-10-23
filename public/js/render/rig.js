@@ -56,6 +56,8 @@ function paint(geo, hex) {
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
 }
 
+// Part tables: [w, h, d, x, y, z, colour, rx, ry, rz]. Head parts are in head
+// space (y up from the head's centre line), back parts in torso-local space.
 function hairParts(o) {
   const h = o.hair;
   switch (o.hairStyle) {
@@ -70,24 +72,89 @@ function hairParts(o) {
       return [[0.39, 0.04, 0.39, 0, 0.4, 0, h], [0.08, 0.2, 0.42, 0, 0.5, 0.01, o.accent]];
     case 'helmet':
       return [[0.44, 0.22, 0.44, 0, 0.36, 0, o.accent], [0.36, 0.08, 0.04, 0, 0.26, -0.22, '#1b2631'], [0.06, 0.1, 0.06, 0.2, 0.36, 0, o.pack]];
+    case 'knight':
+      return [[0.46, 0.34, 0.46, 0, 0.3, 0, o.pack], [0.34, 0.05, 0.05, 0, 0.3, -0.23, '#10141a'], [0.05, 0.14, 0.05, 0, 0.3, -0.23, '#10141a'], [0.07, 0.2, 0.26, 0, 0.55, 0, o.accent]];
+    case 'astro':
+      return [[0.47, 0.1, 0.47, 0, 0.42, 0, '#e8eaed'], [0.47, 0.1, 0.47, 0, 0.14, 0, '#e8eaed'], [0.07, 0.34, 0.47, -0.22, 0.28, 0, '#e8eaed'], [0.07, 0.34, 0.47, 0.22, 0.28, 0, '#e8eaed'], [0.46, 0.34, 0.06, 0, 0.28, 0.2, '#e8eaed'], [0.06, 0.08, 0.06, 0.2, 0.5, 0, o.accent]];
+    case 'chef':
+      return [[0.4, 0.1, 0.4, 0, 0.42, 0, '#f8f9f9'], [0.34, 0.24, 0.34, 0, 0.58, 0, '#ffffff'], [0.44, 0.1, 0.44, 0, 0.74, 0, '#ffffff']];
+    case 'ninja':
+      return [[0.4, 0.12, 0.4, 0, 0.42, 0, h], [0.41, 0.07, 0.41, 0, 0.33, 0, o.accent], [0.1, 0.07, 0.18, 0.1, 0.33, 0.25, o.accent, 0, 0.5, 0], [0.36, 0.17, 0.05, 0, 0.1, -0.2, '#0b0f14']];
+    case 'robot':
+      return [[0.4, 0.1, 0.4, 0, 0.43, 0, o.pants], [0.05, 0.18, 0.05, 0, 0.58, 0, '#7f8c8d'], [0.1, 0.07, 0.1, 0, 0.7, 0, o.accent], [0.34, 0.09, 0.05, 0, 0.27, -0.2, '#10141a'], [0.3, 0.04, 0.04, 0, 0.27, -0.23, o.accent]];
+    case 'ears':
+      return [[0.12, 0.2, 0.08, -0.14, 0.52, 0, h, 0, 0, 0.2], [0.12, 0.2, 0.08, 0.14, 0.52, 0, h, 0, 0, -0.2], [0.18, 0.12, 0.14, 0, 0.12, -0.24, o.accent], [0.07, 0.05, 0.05, 0, 0.17, -0.31, '#1b1b1b'], [0.4, 0.1, 0.4, 0, 0.42, 0, h]];
+    case 'hood':
+      return [[0.45, 0.4, 0.45, 0, 0.28, 0.05, o.accent], [0.4, 0.14, 0.12, 0, 0.5, -0.12, o.accent], [0.5, 0.2, 0.2, 0, 0.1, 0.18, o.accent]];
+    case 'tophat':
+      return [[0.52, 0.04, 0.52, 0, 0.4, 0, '#1b1b1b'], [0.34, 0.34, 0.34, 0, 0.58, 0, '#1b1b1b'], [0.35, 0.06, 0.35, 0, 0.46, 0, o.accent]];
+    case 'crown':
+      return [[0.42, 0.1, 0.42, 0, 0.42, 0, '#ffd700'], [0.07, 0.14, 0.07, -0.16, 0.54, 0, '#ffd700'], [0.07, 0.18, 0.07, 0, 0.56, 0, '#ffd700'], [0.07, 0.14, 0.07, 0.16, 0.54, 0, '#ffd700'], [0.06, 0.06, 0.06, 0, 0.44, -0.22, o.accent]];
+    case 'diver':
+      return [[0.42, 0.1, 0.42, 0, 0.38, 0, '#1b2631'], [0.4, 0.2, 0.06, 0, 0.26, -0.2, o.accent], [0.34, 0.14, 0.05, 0, 0.26, -0.23, '#1d4a6b'], [0.05, 0.3, 0.05, 0.22, 0.4, 0, '#f4d03f']];
+    case 'rock':
+      return [[0.43, 0.2, 0.43, 0, 0.44, 0, h], [0.12, 0.26, 0.12, -0.14, 0.6, 0.02, h, 0, 0, 0.5], [0.12, 0.3, 0.12, 0, 0.64, 0, h], [0.12, 0.26, 0.12, 0.14, 0.6, 0.02, h, 0, 0, -0.5], [0.14, 0.34, 0.14, 0, 0.2, 0.24, h, 0.4, 0, 0]];
     default:
       return [[0.41, 0.14, 0.41, 0, 0.42, 0, h], [0.41, 0.08, 0.1, 0, 0.36, -0.17, h], [0.06, 0.16, 0.36, -0.2, 0.3, 0.02, h], [0.06, 0.16, 0.36, 0.2, 0.3, 0.02, h]];
   }
 }
 
 function blingParts(o) {
+  const A = o.blingA || o.pack, B = o.blingB || o.accent;
   switch (o.bling) {
+    case 'none':
+      return [];
     case 'cape':
-      return [[0.52, 0.85, 0.04, 0, 0.0, 0.2, o.pack, 0.12], [0.54, 0.06, 0.06, 0, 0.42, 0.18, o.accent]];
+      return [[0.52, 0.85, 0.04, 0, 0.0, 0.2, A, 0.12], [0.54, 0.06, 0.06, 0, 0.42, 0.18, B]];
     case 'wings':
-      return [[0.12, 0.2, 0.12, 0, 0.36, 0.24, o.accent], [0.5, 0.36, 0.04, -0.28, 0.44, 0.27, o.pack, 0, 0.3, 0.35], [0.5, 0.36, 0.04, 0.28, 0.44, 0.27, o.pack, 0, -0.3, -0.35]];
+      return [[0.12, 0.2, 0.12, 0, 0.36, 0.24, B], [0.5, 0.36, 0.04, -0.28, 0.44, 0.27, A, 0, 0.3, 0.35], [0.5, 0.36, 0.04, 0.28, 0.44, 0.27, A, 0, -0.3, -0.35], [0.3, 0.24, 0.04, -0.4, 0.28, 0.3, B, 0, 0.3, 0.5], [0.3, 0.24, 0.04, 0.4, 0.28, 0.3, B, 0, -0.3, -0.5]];
     case 'sword':
-      return [[0.06, 0.85, 0.03, 0, 0.32, 0.25, '#d6eaf8', 0, 0, 0.6], [0.24, 0.06, 0.06, -0.05, 0.02, 0.25, o.accent, 0, 0, 0.6], [0.06, 0.2, 0.06, -0.12, -0.1, 0.25, '#5d4037', 0, 0, 0.6]];
+      return [[0.06, 0.85, 0.03, 0, 0.32, 0.25, A, 0, 0, 0.6], [0.24, 0.06, 0.06, -0.05, 0.02, 0.25, B, 0, 0, 0.6], [0.06, 0.2, 0.06, -0.12, -0.1, 0.25, '#5d4037', 0, 0, 0.6]];
     case 'guitar':
-      return [[0.32, 0.34, 0.08, 0.05, 0.18, 0.25, o.pack, 0, 0, -0.4], [0.06, 0.5, 0.05, -0.12, 0.55, 0.25, '#4e342e', 0, 0, -0.4], [0.1, 0.1, 0.09, 0.05, 0.18, 0.25, '#111', 0, 0, -0.4]];
+      return [[0.32, 0.34, 0.08, 0.05, 0.18, 0.25, A, 0, 0, -0.4], [0.06, 0.5, 0.05, -0.12, 0.55, 0.25, '#4e342e', 0, 0, -0.4], [0.1, 0.1, 0.09, 0.05, 0.18, 0.25, '#111', 0, 0, -0.4]];
+    case 'tank':
+      return [[0.15, 0.5, 0.15, -0.12, 0.34, 0.24, A], [0.15, 0.5, 0.15, 0.12, 0.34, 0.24, A], [0.32, 0.06, 0.1, 0, 0.6, 0.24, B], [0.1, 0.06, 0.1, 0, 0.08, 0.24, '#1b1b1b']];
+    case 'jetpack':
+      return [[0.2, 0.44, 0.2, -0.13, 0.34, 0.24, A], [0.2, 0.44, 0.2, 0.13, 0.34, 0.24, A], [0.14, 0.1, 0.14, -0.13, 0.06, 0.24, B], [0.14, 0.1, 0.14, 0.13, 0.06, 0.24, B], [0.46, 0.08, 0.22, 0, 0.58, 0.24, '#2b2b2b']];
+    case 'shell':
+      return [[0.56, 0.5, 0.26, 0, 0.36, 0.28, A], [0.4, 0.34, 0.1, 0, 0.38, 0.4, B], [0.3, 0.2, 0.08, 0, 0.5, 0.46, A]];
+    case 'quiver':
+      return [[0.14, 0.62, 0.14, 0.1, 0.36, 0.24, A, 0, 0, -0.3], [0.04, 0.2, 0.04, 0.16, 0.74, 0.24, B, 0, 0, -0.3], [0.04, 0.2, 0.04, 0.08, 0.76, 0.24, B, 0, 0, -0.3]];
+    case 'scarf':
+      return [[0.52, 0.12, 0.34, 0, 0.62, 0, A], [0.12, 0.42, 0.06, 0.1, 0.36, 0.18, A, 0.1], [0.12, 0.08, 0.06, 0.1, 0.12, 0.2, B]];
+    case 'bedroll':
+      return [[0.5, 0.18, 0.2, 0, 0.62, 0.24, A], [0.5, 0.04, 0.22, 0, 0.62, 0.24, B], [0.42, 0.4, 0.14, 0, 0.32, 0.22, '#6d4c41']];
+    case 'sack':
+      return [[0.4, 0.4, 0.22, 0, 0.3, 0.24, A], [0.26, 0.1, 0.18, 0, 0.55, 0.24, B]];
+    case 'lantern':
+      return [[0.34, 0.3, 0.16, 0, 0.3, 0.24, '#5d4037'], [0.12, 0.16, 0.12, 0.2, 0.0, 0.26, B], [0.14, 0.04, 0.14, 0.2, 0.1, 0.26, A]];
+    case 'flag':
+      return [[0.04, 1.1, 0.04, 0.16, 0.5, 0.22, '#5d4037'], [0.4, 0.28, 0.03, 0.34, 0.92, 0.22, A], [0.12, 0.28, 0.03, 0.54, 0.92, 0.22, B]];
+    case 'shield':
+      return [[0.44, 0.54, 0.07, 0, 0.36, 0.22, A], [0.32, 0.42, 0.04, 0, 0.36, 0.26, B], [0.08, 0.08, 0.04, 0, 0.36, 0.29, A]];
+    case 'drone':
+      return [[0.2, 0.12, 0.2, 0.34, 0.74, 0.14, A], [0.3, 0.03, 0.04, 0.34, 0.82, 0.14, B], [0.04, 0.03, 0.3, 0.34, 0.82, 0.14, B], [0.08, 0.04, 0.08, 0.34, 0.66, 0.14, B]];
     default:
-      return [[0.42, 0.46, 0.2, 0, 0.36, 0.26, o.pack], [0.34, 0.16, 0.06, 0, 0.26, 0.38, o.accent], [0.44, 0.06, 0.22, 0, 0.6, 0.26, o.accent],
+      return [[0.42, 0.46, 0.2, 0, 0.36, 0.26, A], [0.34, 0.16, 0.06, 0, 0.26, 0.38, B], [0.44, 0.06, 0.22, 0, 0.6, 0.26, B],
         [0.05, 0.5, 0.04, -0.18, 0.36, 0.15, '#2d3436'], [0.05, 0.5, 0.04, 0.18, 0.36, 0.15, '#2d3436']];
+  }
+}
+
+// Extra torso layers: [w, h, d, x, y, z, colour] in world space, bound to the torso chain.
+function topParts(o) {
+  switch (o.top) {
+    case 'jacket':
+      return [[0.52, 0.34, 0.33, 0, 1.28, 0, o.accent], [0.1, 0.34, 0.06, -0.12, 1.28, -0.17, o.pack], [0.1, 0.34, 0.06, 0.12, 1.28, -0.17, o.pack]];
+    case 'armor':
+      return [[0.46, 0.36, 0.08, 0, 1.28, -0.17, o.pack], [0.5, 0.1, 0.34, 0, 1.46, 0, o.pack], [0.2, 0.12, 0.34, -0.26, 1.44, 0, o.pack], [0.2, 0.12, 0.34, 0.26, 1.44, 0, o.pack]];
+    case 'coat':
+      return [[0.54, 0.62, 0.34, 0, 1.0, 0, o.shirt], [0.2, 0.3, 0.06, -0.1, 1.24, -0.18, o.accent], [0.2, 0.3, 0.06, 0.1, 1.24, -0.18, o.accent]];
+    case 'apron':
+      return [[0.38, 0.5, 0.05, 0, 1.12, -0.17, '#ffffff'], [0.4, 0.07, 0.06, 0, 1.38, -0.17, o.accent]];
+    case 'vest':
+      return [[0.5, 0.34, 0.33, 0, 1.28, 0, o.pack], [0.14, 0.16, 0.07, -0.13, 1.2, -0.17, o.accent], [0.14, 0.16, 0.07, 0.13, 1.2, -0.17, o.accent]];
+    default:
+      return [];
   }
 }
 
@@ -110,8 +177,10 @@ export function buildRig(outfit) {
   const index = Object.fromEntries(BONES.map((n, i) => [n, i]));
 
   const parts = [];
+  const glowParts = []; // neon trims: drawn unlit so they shine
+  const neon = o.fx === 'neon';
   // add(geo, bone-or-chain, colour): geo must already sit in bind-pose space.
-  const add = (geo, target, hex) => {
+  const add = (geo, target, hex, glow = false) => {
     if (geo.index) geo = geo.toNonIndexed(); // RoundedBox is not indexed; merge needs them all alike
     paint(geo, hex);
     if (typeof target === 'string') {
@@ -119,7 +188,7 @@ export function buildRig(outfit) {
       geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(n * 4).map((_, i) => (i % 4 === 0 ? index[target] : 0)), 4));
       geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(new Float32Array(n * 4).map((_, i) => (i % 4 === 0 ? 1 : 0)), 4));
     } else chainWeights(geo, target, index);
-    parts.push(geo);
+    (glow && neon ? glowParts : parts).push(geo);
   };
   const at = (geo, x, y, z, rx = 0, ry = 0, rz = 0) => {
     if (rx || ry || rz) geo.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz)));
@@ -131,13 +200,15 @@ export function buildRig(outfit) {
   // Torso and pelvis.
   add(at(rbox(0.4, 0.2, 0.27, 0.07, 2), 0, 0.98, 0), TORSO, o.pants);
   add(at(rbox(0.5, 0.5, 0.31, 0.1, 2), 0, 1.24, 0), TORSO, o.shirt);
-  add(at(rbox(0.52, 0.07, 0.33, 0.02), 0, 1.35, 0), TORSO, o.accent); // chest band
+  add(at(rbox(0.52, 0.07, 0.33, 0.02), 0, 1.35, 0), TORSO, o.accent, true); // chest band
   add(at(rbox(0.42, 0.05, 0.29, 0.02), 0, 1.0, 0), TORSO, '#3b2f2f'); // belt
   add(at(rbox(0.09, 0.06, 0.03, 0.01), 0, 1.0, -0.155), TORSO, '#d4ac0d'); // buckle
   add(at(rbox(0.11, 0.11, 0.07, 0.02), -0.19, 0.97, -0.15), TORSO, '#4e5b60'); // pouches
   add(at(rbox(0.11, 0.11, 0.07, 0.02), 0.19, 0.97, -0.15), TORSO, '#4e5b60');
   add(at(new THREE.CylinderGeometry(0.075, 0.09, 0.12, 8), 0, 1.5, 0), TORSO.concat([['neck', 1.6]]), o.skin);
   add(at(rbox(0.3, 0.07, 0.3, 0.03), 0, 1.5, 0), 'spine3', o.shirt); // collar
+
+  for (const [w, h, d, x, y, z, hex] of topParts(o)) add(at(rbox(w, h, d, 0.04, 2), x, y, z), TORSO, hex);
 
   // Head.
   add(at(rbox(0.37, 0.38, 0.35, 0.12, 2), 0, 1.79, 0), 'head', o.skin);
@@ -150,7 +221,7 @@ export function buildRig(outfit) {
   for (const s of [-1, 1]) {
     const side = s < 0 ? 'L' : 'R';
     const ARM = [[`lowerArm${side}`, 1.12], [`upperArm${side}`, 1.22]];
-    add(at(new THREE.SphereGeometry(0.105, 6, 4), s * 0.27, 1.46, 0), `upperArm${side}`, o.accent); // shoulder pad
+    add(at(new THREE.SphereGeometry(0.105, 6, 4), s * 0.27, 1.46, 0), `upperArm${side}`, o.accent, true); // shoulder pad
     add(at(new THREE.CapsuleGeometry(0.075, 0.2, 2, 6), s * 0.27, 1.3, 0), ARM, o.shirt);
     add(at(new THREE.CapsuleGeometry(0.066, 0.2, 2, 6), s * 0.27, 1.04, 0), ARM, o.skin);
     add(at(rbox(0.15, 0.06, 0.15, 0.02), s * 0.27, 1.12, 0), ARM, o.shirt); // cuff
@@ -160,10 +231,10 @@ export function buildRig(outfit) {
     const LEG = [[`lowerLeg${side}`, 0.4], [`upperLeg${side}`, 0.5]];
     add(at(new THREE.CapsuleGeometry(0.1, 0.3, 2, 6), s * 0.12, 0.68, 0), LEG, o.pants);
     add(at(new THREE.CapsuleGeometry(0.088, 0.3, 2, 6), s * 0.12, 0.23, 0), LEG, o.pants);
-    add(at(rbox(0.15, 0.12, 0.06, 0.03), s * 0.12, 0.45, -0.09), LEG, o.accent); // knee pad
+    add(at(rbox(0.15, 0.12, 0.06, 0.03), s * 0.12, 0.45, -0.09), LEG, o.accent, true); // knee pad
     add(at(rbox(0.18, 0.12, 0.3, 0.05, 2), s * 0.12, 0.07, -0.04), `foot${side}`, '#242424'); // boot
     add(at(rbox(0.19, 0.04, 0.32, 0.02), s * 0.12, 0.02, -0.04), `foot${side}`, '#f2f2f2'); // sole
-    add(at(rbox(0.12, 0.03, 0.08, 0.01), s * 0.12, 0.11, -0.16), `foot${side}`, o.accent); // laces
+    add(at(rbox(0.12, 0.03, 0.08, 0.01), s * 0.12, 0.11, -0.16), `foot${side}`, o.accent, true); // laces
   }
 
   // Back bling, bound to the chest.
@@ -180,6 +251,14 @@ export function buildRig(outfit) {
   mesh.updateMatrixWorld(true);
   const skeleton = new THREE.Skeleton(list);
   mesh.bind(skeleton);
+  let glowMesh = null;
+  if (glowParts.length) {
+    const gg = mergeGeometries(glowParts, false);
+    glowMesh = new THREE.SkinnedMesh(gg, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
+    glowMesh.frustumCulled = false;
+    mesh.add(glowMesh);
+    glowMesh.bind(skeleton, mesh.matrixWorld);
+  }
 
   // Sockets: where held items and accessories attach.
   const socket = (name, parent, pos, rot = [0, 0, 0]) => {
@@ -211,7 +290,12 @@ export function buildRig(outfit) {
   lod.visible = false;
   root.add(lod);
 
-  return { root, tilt, mesh, skeleton, bones, sockets, face, lod, outfit: o };
+  // Series effects that change over time: Shadow outfits pulse a dark violet glow.
+  const fxUpdate = o.fx === 'shadow'
+    ? (t) => material.emissive.setHSL(0.76, 0.85, 0.07 + 0.05 * Math.sin(t * 1.6))
+    : null;
+
+  return { root, tilt, mesh, glowMesh, skeleton, bones, sockets, face, lod, outfit: o, fxUpdate };
 }
 
 // Eyes, brows and mouth on a small canvas. Expressions redraw only when changed.

@@ -30,7 +30,7 @@ export const ACTIONS = [
   { id: 'matCycle', label: 'Change material', group: 'Building', def: 'KeyT' },
   { id: 'edit', label: 'Edit', group: 'Building', def: 'KeyF' },
   { id: 'editReset', label: 'Reset edit', group: 'Building', def: 'Mouse2' },
-  { id: 'emote', label: 'Play next emote (wheel comes with the locker)', group: 'Other', def: 'KeyB' },
+  { id: 'emote', label: 'Emote wheel (hold, move mouse, release)', group: 'Other', def: 'KeyB' },
   { id: 'swapShoulder', label: 'Swap camera shoulder', group: 'Other', def: 'KeyG' },
   { id: 'map', label: 'Map', group: 'Other', def: 'KeyM' },
 ];

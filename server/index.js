@@ -5,6 +5,7 @@ import { decodeCommands, MSG } from '../shared/net/protocol.js';
 import { Matchmaker } from './matchmaker.js';
 import { RateLimiter, Violations, cleanName } from './limits.js';
 import { parseCookies } from './api.js';
+import { FREE_ITEMS, sanitizeLoadout } from '../shared/cosmetics/catalog.js';
 
 class Client {
   constructor(ws, ip) {
@@ -81,8 +82,10 @@ export function attachGameServer(httpServer, opts = {}) {
         // Signed-in players play under their account name and get results saved.
         if (c.cookie && opts.accounts && opts.accounts.db.ready) {
           const u = await opts.accounts.userForToken(c.cookie).catch(() => null);
-          if (u) { c.userId = Number(u.id); c.name = u.username; }
+          if (u) { c.userId = Number(u.id); c.name = u.username; c.loadout = await opts.accounts.getLoadout(u.id).catch(() => null); }
         }
+        // Guests get whatever of their loadout is free to everyone.
+        if (!c.loadout) c.loadout = sanitizeLoadout(m.loadout, new Set(FREE_ITEMS));
         matchmaker.join(c, 'solo');
         break;
       }

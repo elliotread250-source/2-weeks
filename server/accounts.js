@@ -10,10 +10,19 @@ const SESSION_DAYS = 30;
 const MAX_BAD_PINS = 8;
 const LOCK_MINUTES = 15;
 
-export const DEFAULT_OWNED = [
-  ...Array.from({ length: 8 }, (_, i) => `outfit_${i}`),
-  'pickaxe_default', 'glider_default', 'emote_wave', 'emote_dance_basic',
-];
+import { FREE_ITEMS, DEFAULT_LOADOUT, sanitizeLoadout } from '../shared/cosmetics/catalog.js';
+
+export const DEFAULT_OWNED = FREE_ITEMS;
+
+// DB row -> the loadout object the game uses, cleaned against what is owned.
+export function rowToLoadout(row, owned) {
+  if (!row) return { ...DEFAULT_LOADOUT, emotes: [...DEFAULT_LOADOUT.emotes], colours: {} };
+  const raw = {
+    outfit: row.outfit, outfitStyle: row.outfit_style, backBling: row.back_bling, pickaxe: row.pickaxe, glider: row.glider,
+    contrail: row.contrail, wrap: row.wrap, emotes: row.emotes, banner: row.banner, loadingScreen: row.loading_screen, colours: row.colours,
+  };
+  return sanitizeLoadout(raw, owned);
+}
 
 export class AccountError extends Error {
   constructor(message, status = 400, extra = {}) {
@@ -55,7 +64,7 @@ export class Accounts {
         const id = rows[0].id;
         await c.query('INSERT INTO wallets (user_id) VALUES ($1)', [id]);
         await c.query('INSERT INTO stats (user_id) VALUES ($1)', [id]);
-        await c.query('INSERT INTO loadouts (user_id, emotes) VALUES ($1, $2)', [id, ['emote_wave', 'emote_dance_basic']]);
+        await c.query('INSERT INTO loadouts (user_id, emotes) VALUES ($1, $2)', [id, DEFAULT_LOADOUT.emotes.map((e) => e || '')]);
         for (const item of DEFAULT_OWNED) {
           await c.query('INSERT INTO owned_items (user_id, item_id, source) VALUES ($1, $2, $3)', [id, item, 'default']);
         }
@@ -131,10 +140,32 @@ export class Accounts {
     return {
       user: { id: Number(u.rows[0].id), username: u.rows[0].username, createdAt: u.rows[0].created_at },
       wallet: { coins: Number(w.rows[0].coins), lifetime: Number(w.rows[0].lifetime_earned) },
-      loadout: l.rows[0],
+      loadout: rowToLoadout(l.rows[0], o.rows.map((r) => r.item_id)),
       owned: o.rows.map((r) => r.item_id),
       stats: s.rows[0],
     };
+  }
+
+  async ownedSet(userId) {
+    const { rows } = await this.db.query('SELECT item_id FROM owned_items WHERE user_id = $1', [userId]);
+    return new Set(rows.map((r) => r.item_id));
+  }
+
+  async getLoadout(userId) {
+    const [l, owned] = await Promise.all([this.db.query('SELECT * FROM loadouts WHERE user_id = $1', [userId]), this.ownedSet(userId)]);
+    return rowToLoadout(l.rows[0], owned);
+  }
+
+  // Validate against ownership, then store. Returns the cleaned loadout.
+  async saveLoadout(userId, raw) {
+    const owned = await this.ownedSet(userId);
+    const l = sanitizeLoadout(raw, owned);
+    await this.db.query(
+      `UPDATE loadouts SET outfit = $2, outfit_style = $3, back_bling = $4, pickaxe = $5, glider = $6, contrail = $7,
+         wrap = $8, emotes = $9, banner = $10, loading_screen = $11, colours = $12 WHERE user_id = $1`,
+      [userId, l.outfit, l.outfitStyle, l.backBling, l.pickaxe, l.glider, l.contrail, l.wrap, l.emotes.map((e) => e || ''), l.banner, l.loadingScreen, JSON.stringify(l.colours)],
+    );
+    return l;
   }
 
   // ------------------------------------------------------------ coins

@@ -45,7 +45,9 @@ needDb('registering creates the wallet, loadout, stats and default items', async
   assert.equal(p.user.username, 'Alice');
   assert.equal(p.wallet.coins, 0);
   assert.ok(p.owned.includes('outfit_0') && p.owned.includes('pickaxe_default'));
-  assert.equal(p.loadout.emotes.length, 2);
+  assert.equal(p.loadout.emotes.length, 6);
+  assert.deepEqual(p.loadout.emotes.slice(0, 2), ['emote_wave', 'emote_dance_basic']);
+  assert.equal(p.loadout.outfit, 'outfit_0');
   assert.equal(p.stats.matches, 0);
   assert.equal((await accounts.userForToken(s.token)).username, 'Alice');
 });
@@ -166,4 +168,31 @@ test('HTTP: with the database down the API says so', async () => {
     assert.equal(r.status, 503);
     assert.match((await r.json()).error, /Can't reach the server/);
   }, dead);
+});
+
+needDb('a saved loadout only keeps items the account owns', async () => {
+  const { userId } = await accounts.register('Gwen', '902817');
+  const saved = await accounts.saveLoadout(userId, { outfit: 'outfit_3', pickaxe: 'pickaxe_axe_timber_axe', glider: 'glider_standard_wing', emotes: ['emote_dance_basic', 'emote_flex', null, null, null, null] });
+  assert.equal(saved.outfit, 'outfit_3', 'a free outfit is allowed');
+  assert.equal(saved.pickaxe, 'pickaxe_default', 'an unowned pickaxe falls back');
+  assert.equal(saved.emotes[0], 'emote_dance_basic');
+  assert.equal(saved.emotes[1], 'emote_dance_basic', 'an unowned emote is dropped; the free slot-2 default returns');
+  await db.query("INSERT INTO owned_items (user_id, item_id, source) VALUES ($1, 'emote_flex', 'shop')", [userId]);
+  const again = await accounts.saveLoadout(userId, { emotes: [null, 'emote_flex'] });
+  assert.equal(again.emotes[1], 'emote_flex');
+  assert.equal((await accounts.getLoadout(userId)).emotes[1], 'emote_flex');
+});
+
+needDb('HTTP: /api/loadout needs a session', async () => {
+  await withApi(async (base) => {
+    const r = await post(base, '/api/loadout', { loadout: {} });
+    assert.equal(r.status, 401);
+    const reg = await post(base, '/api/register', { username: 'Hana', pin: '561739' });
+    const cookie = reg.headers.get('set-cookie').split(';')[0];
+    const ok = await post(base, '/api/loadout', { loadout: { outfit: 'outfit_5' } }, { cookie });
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).loadout.outfit, 'outfit_5');
+    const me = await fetch(base + '/api/me', { headers: { cookie } }).then((x) => x.json());
+    assert.equal(me.loadout.outfit, 'outfit_5');
+  });
 });

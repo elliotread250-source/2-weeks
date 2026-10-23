@@ -21,7 +21,7 @@ import { BotBrain } from './bot.js';
 import { Combat } from './combat.js';
 import { Storm } from './storm.js';
 import { applyCommand } from './controller.js';
-import { OUTFITS } from '../cosmetics/outfits.js';
+import { DEFAULT_LOADOUT, resolveOutfit, randomLoadout } from '../cosmetics/catalog.js';
 
 export class Match {
   constructor(opts = {}) {
@@ -71,8 +71,8 @@ export class Match {
 
   // ------------------------------------------------------------ roster
 
-  addHuman(name, outfit = OUTFITS[0]) {
-    const f = new Fighter(name, outfit, { human: true });
+  addHuman(name, loadout = DEFAULT_LOADOUT) {
+    const f = new Fighter(name, resolveOutfit(loadout), { human: true, loadout });
     this.fighters.push(f);
     this.inbox.set(f.id, []);
     return f;
@@ -81,7 +81,8 @@ export class Match {
   addBots(count = this.botCount) {
     const names = [...BOT_NAMES].sort(() => this.rng.random() - 0.5);
     for (let i = 0; i < count; i++) {
-      const f = new Fighter(names[i % names.length], OUTFITS[(i + 1) % OUTFITS.length]);
+      const loadout = randomLoadout(this.rng);
+      const f = new Fighter(names[i % names.length], resolveOutfit(loadout), { loadout });
       new BotBrain(this, f, this.rng.range(0.15, 0.85));
       this.fighters.push(f);
     }

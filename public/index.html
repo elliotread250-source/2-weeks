@@ -106,6 +106,7 @@
       </div>
       <div id="online-status"></div>
       <div class="lobby-actions">
+        <button id="locker-btn" class="ghost">LOCKER</button>
         <button id="settings-btn" class="ghost">SETTINGS &amp; KEYBINDS</button>
       </div>
     </div>
@@ -120,6 +121,29 @@
       <div class="auth-actions"><button type="submit" id="auth-submit">SIGN IN</button><button type="button" id="auth-cancel" class="ghost">CANCEL</button></div>
       <p class="hint">You can play without an account. An account keeps your coins, items and stats.</p>
     </form>
+  </div>
+
+  <div id="locker" class="hidden">
+    <div class="locker-head">
+      <h2>Locker</h2>
+      <button id="locker-close" class="ghost">DONE</button>
+    </div>
+    <div class="locker-body">
+      <div id="locker-slots"></div>
+      <div class="locker-stage">
+        <canvas id="locker-canvas"></canvas>
+        <div id="locker-info"></div>
+        <div id="locker-styles"></div>
+      </div>
+      <div class="locker-items">
+        <div class="locker-filters">
+          <input id="locker-search" placeholder="Search" autocomplete="off" />
+          <select id="locker-rarity"><option value="-1">All rarities</option><option value="0">Common</option><option value="1">Uncommon</option><option value="2">Rare</option><option value="3">Epic</option><option value="4">Legendary</option></select>
+          <label><input id="locker-owned" type="checkbox" /> Owned only</label>
+        </div>
+        <div id="locker-grid"></div>
+      </div>
+    </div>
   </div>
 
   <div id="pause" class="hidden">

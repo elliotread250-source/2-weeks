@@ -9,6 +9,7 @@
 import { TICK_RATE, TICK_DT } from '/shared/config.js';
 import { Match } from '/shared/sim/match.js';
 import { Fighter } from '/shared/sim/fighter.js';
+import { resolveOutfit } from '/shared/cosmetics/catalog.js';
 import { applyMovement, HELD } from '/shared/sim/controller.js';
 import { BUILD_COST, MATERIALS } from '/shared/config.js';
 import { encodeCommands, decodeSnapshot, heldItem, MAX_CMDS_PER_PACKET } from '/shared/net/protocol.js';
@@ -21,7 +22,7 @@ const SMOOTH_TAU = 0.1;
 
 export class NetHost {
   // Opens the socket, joins (or resumes) and resolves once welcomed.
-  static connect(url, { name, resumeToken, onStatus = () => {} } = {}) {
+  static connect(url, { name, resumeToken, loadout, onStatus = () => {} } = {}) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
@@ -29,7 +30,7 @@ export class NetHost {
       ws.onerror = () => fail("Can't reach the game server");
       ws.onclose = () => fail('Connection closed before the match started');
       ws.onopen = () => {
-        ws.send(JSON.stringify(resumeToken ? { t: 'resume', token: resumeToken } : { t: 'join', name, mode: 'solo' }));
+        ws.send(JSON.stringify(resumeToken ? { t: 'resume', token: resumeToken } : { t: 'join', name, mode: 'solo', loadout }));
         onStatus('Finding match...');
       };
       ws.onmessage = (e) => {
@@ -57,7 +58,7 @@ export class NetHost {
     const match = new Match({ seed: welcome.seed, botCount: 0, replica: true });
     this.match = match;
     for (const r of welcome.fighters) {
-      const f = new Fighter(r.name, r.outfit, { human: r.human });
+      const f = new Fighter(r.name, resolveOutfit(r.loadout), { human: r.human, loadout: r.loadout });
       f.id = r.id;
       f.hidden = r.id !== welcome.self;
       match.fighters.push(f);

@@ -3,7 +3,6 @@
 // including presses that happen between ticks.
 import { binds, settings } from './binds.js';
 import { HELD, ACT, PIECES, emptyCommand } from '/shared/sim/controller.js';
-import { EMOTE_COUNT } from '/shared/config.js';
 
 const SLOT_ACTIONS = ['pickaxe', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5'];
 
@@ -19,7 +18,7 @@ export class InputController {
     this.mapOpen = false;
     this.seq = 0;
     this.shoulder = 1;
-    this.nextEmote = 1;
+    this.wheel = null;
     this.emoteReq = 0;
     this.resetEdges();
     this.bind();
@@ -57,7 +56,7 @@ export class InputController {
         case 'aim': this.act |= ACT.AIM; break;
         case 'matCycle': this.act |= ACT.MAT; break;
         case 'swapShoulder': this.act |= ACT.SHOULDER; this.shoulder = -this.shoulder; break;
-        case 'emote': this.emoteReq = this.nextEmote; this.nextEmote = (this.nextEmote % EMOTE_COUNT) + 1; break;
+        case 'emote': this.openWheel(); break;
         case 'map': this.mapOpen = !this.mapOpen; break;
         default:
           if (SLOT_ACTIONS.includes(a)) this.slot = SLOT_ACTIONS.indexOf(a);
@@ -69,6 +68,26 @@ export class InputController {
   up(code) {
     if (!this.keys.delete(code)) return;
     if (this.actionsFor(code).includes('fire')) this.act |= ACT.FIRE_UP;
+    if (this.actionsFor(code).includes('emote')) this.closeWheel();
+  }
+
+  // Hold the emote key: the mouse picks one of six slots. A quick tap with no
+  // movement plays the first equipped emote.
+  openWheel() {
+    const slots = this.hooks.emoteSlots ? this.hooks.emoteSlots() : [];
+    this.wheel = { x: 0, y: 0, sel: -1, at: performance.now(), slots };
+    this.hooks.onWheel?.(this.wheel);
+  }
+
+  closeWheel() {
+    const w = this.wheel;
+    if (!w) return;
+    this.wheel = null;
+    this.hooks.onWheel?.(null);
+    let sel = w.sel;
+    if (sel < 0 && performance.now() - w.at < 250) sel = 0;
+    const clip = sel >= 0 ? w.slots[sel] : 0;
+    if (clip) this.emoteReq = clip;
   }
 
   bind() {
@@ -93,6 +112,18 @@ export class InputController {
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
       if (!this.locked) return;
+      if (this.wheel) {
+        const w = this.wheel;
+        w.x = Math.max(-90, Math.min(90, w.x + e.movementX));
+        w.y = Math.max(-90, Math.min(90, w.y + e.movementY));
+        if (Math.hypot(w.x, w.y) > 28) {
+          // Six wedges, first one straight up, clockwise.
+          const a = (Math.atan2(w.x, -w.y) + Math.PI * 2) % (Math.PI * 2);
+          w.sel = Math.floor((a + Math.PI / 6) / (Math.PI / 3)) % 6;
+        }
+        this.hooks.onWheel?.(w);
+        return;
+      }
       this.mdx += e.movementX;
       this.mdy += e.movementY;
     });

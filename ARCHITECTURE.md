@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 1 to 4 done (sim split from renderer; online netcode; accounts; skinned characters). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 to 5 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -51,6 +51,12 @@ New sim state for this: crouch (held bit 128), emote command (1..25, cancelled b
 `public/viewer.html` is a developer page that plays any clip on any default outfit; `tools/shots.mjs` renders poses to PNG. `render/glb.js` loads an authored Mixamo-skeleton .glb from `public/assets/characters/` and renames its bones to ours so every clip binds; rest-pose axis corrections (`RETARGET_FIX`) are the part still to do if a real asset is dropped in. Nothing depends on it.
 
 Caveats: crouch, emotes and the animator are verified by unit tests and software-rendered screenshots, not on a GPU. Knocked/revive clips exist but the sim has no downed state yet (Duos/Squads).
+
+## Cosmetics and the locker (Phase 5)
+
+`shared/cosmetics/catalog.js` is the single source of truth: every item has an id, type, rarity, price, optional `spec` (the recipe the renderer builds from) and `shop`/`unlock` flags. `sanitizeLoadout(raw, owned)` is the only way a loadout gets accepted, on the client before use and on the server before storing or seating a player; anything not owned falls back to the default. `resolveOutfit` turns a loadout into the rig recipe (outfit + style + custom palette colours + back bling).
+
+Client: `client/loadout.js` holds the store (owned set + loadout) and persists it (server for accounts, localStorage for guests). `ui/locker.js` is the screen; `render/stage.js` is the preview canvas with its own renderer; `render/icons3d.js` renders tile icons offscreen once and caches them in IndexedDB. `ui/wheel.js` is the in-game emote wheel, fed by `InputController` (mouse deltas go to the wheel, not the camera, while it is open). Emotes travel as a clip number in the command, so no cosmetic data crosses the network except the roster loadout sent in the welcome.
 
 ## Module map: where everything moves
 
