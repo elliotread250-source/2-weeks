@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { attachGameServer } from './server/index.js';
 import { Db } from './server/db.js';
 import { Accounts } from './server/accounts.js';
+import { Economy } from './server/economy.js';
 import { createApi } from './server/api.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -50,6 +51,7 @@ function resolve(urlPath) {
 
 export const db = new Db();
 export const accounts = new Accounts(db, process.env.SESSION_SECRET);
+db.economy = new Economy(accounts);
 const api = createApi({ db, accounts });
 if (!process.env.SESSION_SECRET) console.warn('[accounts] SESSION_SECRET is not set: sessions will not survive a restart');
 

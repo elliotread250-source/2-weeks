@@ -306,7 +306,7 @@ export class BotBrain {
         if (g.loot.pickups.includes(p)) g.pickupItem(f, p);
         this.goal = null;
       } else if (this.goalKind === 'chest' && d < 1.8) {
-        g.loot.openChest(this.goalObj);
+        g.loot.openChest(this.goalObj, this.f);
         this.goal = null;
       } else if (this.goalKind === 'harvest' && this.harvestTarget) {
         const h = this.harvestTarget;

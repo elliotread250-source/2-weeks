@@ -103,6 +103,7 @@ export class NetHost {
     const m = JSON.parse(e.data);
     if (m.t === 'ev') for (const w of m.e) applyWireEvent(this.match, w);
     else if (m.t === 'pong') this.rtt = (this.now() - m.c) * 1000;
+    else if (m.t === 'reward' && this.onReward) this.onReward(m);
   }
 
   onSnapshot(s) {

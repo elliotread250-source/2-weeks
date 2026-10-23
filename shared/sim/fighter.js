@@ -31,6 +31,8 @@ export class Fighter {
     this.reset();
     this.kills = 0;
     this.damageDealt = 0;
+    // Counters the economy and challenges read after the match.
+    this.stats = { assists: 0, headshots: 0, chests: 0, harvested: 0, built: 0 };
     this.diedAt = 0; // match time of final elimination (or the win)
     this.eliminated = false;
   }
@@ -55,6 +57,7 @@ export class Fighter {
     this.pendingSwing = null;
     this.flash = 0;
     this.lastHitBy = null;
+    this.contrib = new Map(); // attacker id -> damage dealt to me, for assists
     this.resetControl();
   }
 

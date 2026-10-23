@@ -87,7 +87,20 @@ Not done / to check:
 - Items you do not own cannot be bought yet (shop is Phase 6). Banners and loading screens are equippable and shown as icons only; they appear in the end-of-match card in Phase 11.
 - All visuals judged from software renders. The held pickaxe pose in the locker preview is rough.
 
-## Next: Phase 6 (coins, item shop, challenges)
+## Phase 6: coins, item shop, challenges (done 2026-10-23)
+
+Done:
+- `shared/economy/`: coin table (elim 10, assist 4, placement 5/20/35/100, survival 1/min capped 15, offline pays 50% with a 500/day cap, daily login 25), seeded daily/featured shop rotation (00:00 UTC), 46 data-driven challenges (22 daily, 14 weekly on a Thursday 13:00 UTC reset, 10 lifetime milestones that unlock the challenge-only items).
+- Sim counters (assists, headshots, chests, materials harvested, pieces built) per fighter, folded into progress on the server only.
+- `server/economy.js`: online match payout and challenge progress inside the match-recording transaction (idempotent on the ledger), buying (one transaction, shelf check, ownership check, parallel clicks charge once), 1 reroll a day, daily login on first `/api/me` of the UTC day, offline results with plausibility checks, 60 s gap and the daily cap. Migration 002 adds reroll bookkeeping.
+- Client: ITEM SHOP and CHALLENGES screens (guests see a sign-in note), toasts, end-of-match coin card (real payout when signed in online; estimate plus "make an account to keep these Coins" for guests).
+- Tests: 98 pass (11 new, five of them against real Postgres). `npm test` now runs files one at a time because the DB tests share a schema.
+
+Not done / to check:
+- Offline matches pay coins but do not advance challenges (a client report cannot be trusted for that). Party codes are not built; they depend on a private-room flow in the matchmaker and land with the lobby rework in Phase 11.
+- Challenge text/rewards are first-pass numbers; tune after real play.
+
+## Next: Phase 7 (weapons and combat)
 
 Not started.
 

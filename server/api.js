@@ -43,6 +43,13 @@ export function clientIp(req) {
 }
 
 export function createApi({ db, accounts }) {
+  const economy = db.economy || null;
+  const need = async (token) => {
+    const u = await accounts.userForToken(token);
+    if (!u) throw new AccountError('Sign in first', 401);
+    if (!economy) throw new AccountError('Not available', 503);
+    return u;
+  };
   const limits = new Map(); // `${ip}:${bucket}` -> RateLimiter
   const limit = (ip, bucket, perMin) => {
     const k = `${ip}:${bucket}`;
@@ -104,7 +111,32 @@ export function createApi({ db, accounts }) {
         case 'GET /api/me': {
           const u = await accounts.userForToken(token);
           if (!u) return json(res, 200, { guest: true });
-          return json(res, 200, await accounts.profile(u.id));
+          const bonus = economy ? await economy.dailyLogin(u.id) : 0; // first visit of the UTC day only
+          return json(res, 200, { ...(await accounts.profile(u.id)), dailyLogin: bonus });
+        }
+        case 'GET /api/shop': {
+          const u = await need(token);
+          return json(res, 200, await economy.shop(u.id));
+        }
+        case 'POST /api/shop/buy': {
+          const u = await need(token);
+          if (!limit(ip, 'buy', 30)) throw new AccountError('Slow down', 429);
+          const b = await readBody(req, 1024);
+          return json(res, 200, await economy.buy(u.id, String(b.id)));
+        }
+        case 'GET /api/challenges': {
+          const u = await need(token);
+          return json(res, 200, await economy.challenges(u.id));
+        }
+        case 'POST /api/challenges/reroll': {
+          const u = await need(token);
+          const b = await readBody(req, 1024);
+          return json(res, 200, await economy.reroll(u.id, b.slot));
+        }
+        case 'POST /api/offline-result': {
+          const u = await need(token);
+          const b = await readBody(req, 1024);
+          return json(res, 200, await economy.rewardOffline(u.id, b));
         }
         default:
           throw new AccountError('Not found', 404);

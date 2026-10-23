@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 1 to 5 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 to 6 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -57,6 +57,10 @@ Caveats: crouch, emotes and the animator are verified by unit tests and software
 `shared/cosmetics/catalog.js` is the single source of truth: every item has an id, type, rarity, price, optional `spec` (the recipe the renderer builds from) and `shop`/`unlock` flags. `sanitizeLoadout(raw, owned)` is the only way a loadout gets accepted, on the client before use and on the server before storing or seating a player; anything not owned falls back to the default. `resolveOutfit` turns a loadout into the rig recipe (outfit + style + custom palette colours + back bling).
 
 Client: `client/loadout.js` holds the store (owned set + loadout) and persists it (server for accounts, localStorage for guests). `ui/locker.js` is the screen; `render/stage.js` is the preview canvas with its own renderer; `render/icons3d.js` renders tile icons offscreen once and caches them in IndexedDB. `ui/wheel.js` is the in-game emote wheel, fed by `InputController` (mouse deltas go to the wheel, not the camera, while it is open). Emotes travel as a clip number in the command, so no cosmetic data crosses the network except the roster loadout sent in the welcome.
+
+## Economy (Phase 6)
+
+All rules are pure data in `shared/economy/` (coin table, shop rotation, challenge defs) and all money movement is in `server/economy.js`. Rule: every coin change is `accounts.applyLedger` inside a transaction, keyed by (user, reason, ref), so a retry is a no-op. Online: `recordMatch` pays the match and advances challenges in the same transaction, then the room sends a `reward` frame to each signed-in client. Offline: the client posts its result to `/api/offline-result`; the server checks plausibility, enforces a 60 s gap and 500 coins/day, and pays half rate. The shop is a pure function of the UTC date, so `buy` simply checks the item is on today's shelf. Known limit: an offline cheater can fake results up to the daily cap.
 
 ## Module map: where everything moves
 

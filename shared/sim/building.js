@@ -201,6 +201,7 @@ export class BuildSystem {
     this.pieces.set(p.key, p);
     this.list.push(p);
     this.rebuild(p);
+    if (owner && owner.stats) owner.stats.built++;
     this.emit('buildPlaced', { p });
     return p;
   }

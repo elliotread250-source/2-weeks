@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node --import ./tools/loader.mjs --test tests/*.test.js"
+    "test": "node --import ./tools/loader.mjs --test --test-concurrency=1 tests/*.test.js"
   },
   "engines": {
     "node": ">=20"

@@ -245,7 +245,7 @@ function updateInteract(match, f, act, held, dt) {
     if (held(HELD.INTERACT)) {
       f.chestT += dt;
       if (f.chestT >= INTERACT.chestHold) {
-        match.loot.openChest(t.chest);
+        match.loot.openChest(t.chest, f);
         match.emit('sfx', { name: 'chest', by: f.id, own: true });
         f.chestT = 0;
       }

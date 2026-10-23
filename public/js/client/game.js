@@ -462,6 +462,14 @@ export class Game {
       title.className = 'end-title lose';
     }
     sub.textContent = `${ev.kills} elimination${ev.kills === 1 ? '' : 's'}`;
+    document.getElementById('end-rewards').innerHTML = '';
+    if (this.opts.onEnd) {
+      const p = this.player;
+      this.opts.onEnd({
+        placement: ev.placement, total: this.match.fighters.length, kills: ev.kills,
+        assists: (p.stats && p.stats.assists) || 0, survivalS: Math.round(p.diedAt || this.match.time),
+      }, !!this.opts.host);
+    }
     setTimeout(() => {
       end.classList.remove('hidden');
       document.exitPointerLock?.();

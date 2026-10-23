@@ -237,6 +237,10 @@ export class Match {
 
     const killer = source && source !== target ? source : (target.lastHitBy && this.time - target.lastHitBy.t < 10 ? target.lastHitBy.f : null);
     if (killer) killer.kills++;
+    for (const [id, dmg] of target.contrib) {
+      const helper = id !== (killer && killer.id) && dmg >= 20 ? this.fighters.find((x) => x.id === id) : null;
+      if (helper && helper !== target) helper.stats.assists++;
+    }
     const text = killer
       ? `${killer.name} eliminated ${target.name}${weaponName ? ` with ${weaponName}` : ''}`
       : `${target.name} was eliminated by ${weaponName || GAME.storm}`;
