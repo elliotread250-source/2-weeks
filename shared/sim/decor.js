@@ -180,6 +180,6 @@ function scatter(R, count, accept) {
 
 // Palm trees along the beaches. Harvestable wood like any other tree.
 export function addPalms(world) {
-  const spots = scatter(world.R2, 45, (x, z, h) => h > 1.2 && h < 2.6 && !inPad(x, z, 3) && distToRoad(x, z) > 4 && world.free(x, z, 1, 1));
+  const spots = scatter(world.R2, 110, (x, z, h) => h > 1.2 && h < 2.6 && !inPad(x, z, 3) && distToRoad(x, z) > 4 && world.free(x, z, 1, 1));
   for (const [x, , z] of spots) world.palm(x, z);
 }

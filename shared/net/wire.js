@@ -155,7 +155,7 @@ export function applyWelcome(match, w) {
   }
   for (const d of w.builds) {
     const p = addRemotePiece(match, d);
-    match.pushEvent('buildPlaced', { p });
+    match.pushEvent('buildPlaced', { p, fresh: false });
     if (p.built) match.pushEvent('buildComplete', { p });
   }
   if (w.bus) setBus(match, w.bus);

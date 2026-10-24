@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32 } from '/shared/math/util.js';
 import { DECOR_SEED } from '/shared/config.js';
-import { ROADS, POIS, terrainHeight, distToRoad, TERRAIN_SIZE } from '/shared/sim/terrain.js';
+import { ROADS, POIS, terrainHeight, distToRoad, TERRAIN_SIZE, biomeAt } from '/shared/sim/terrain.js';
 
 function inPad(x, z, extra = 0) {
   return POIS.some((p) => Math.hypot(x - p.x, z - p.z) < p.pad + extra);
@@ -129,13 +129,13 @@ export function addGrassAndBushes(scene, world, detail) {
     return out;
   };
   const low = detail === 'low';
-  const onGrass = (x, z, h) => h > 2.6 && !inPad(x, z, 2) && distToRoad(x, z) > 4.2 && slopeAt(x, z) < 2.4;
+  const onGrass = (x, z, h) => h > 2.6 && biomeAt(x, z) !== 'snow' && biomeAt(x, z) !== 'desert' && !inPad(x, z, 2) && distToRoad(x, z) > 4.2 && slopeAt(x, z) < 2.4;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), s = new THREE.Vector3();
   const color = new THREE.Color();
 
   // Grass tufts, clustered so the meadows look patchy rather than uniform.
   const tufts = [];
-  const centres = scatter(low ? 260 : 700, onGrass);
+  const centres = scatter(low ? 560 : 1500, onGrass);
   for (const [cx, , cz] of centres) {
     const n = low ? 8 : 18;
     for (let i = 0; i < n; i++) {
@@ -157,7 +157,7 @@ export function addGrassAndBushes(scene, world, detail) {
   scene.add(grass);
 
   // Flowers.
-  const fl = scatter(low ? 500 : 1800, onGrass);
+  const fl = scatter(low ? 1100 : 3900, onGrass);
   const flowers = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.11, 0), new THREE.MeshLambertMaterial({ color: '#ffffff' }), fl.length);
   fl.forEach(([x, h, z], i) => {
     m4.compose(v.set(x, h + 0.3, z), q.identity(), s.set(1, 0.7, 1));
@@ -167,7 +167,7 @@ export function addGrassAndBushes(scene, world, detail) {
   scene.add(flowers);
 
   // Bushes (walk-through, like Fortnite's).
-  const bu = scatter(low ? 140 : 380, (x, z, h) => h > 2.4 && !inPad(x, z, -4) && distToRoad(x, z) > 4 && slopeAt(x, z) < 3 && world.free(x, z, 0.6, 0.6, 0));
+  const bu = scatter(low ? 300 : 830, (x, z, h) => h > 2.4 && !inPad(x, z, -4) && distToRoad(x, z) > 4 && slopeAt(x, z) < 3 && world.free(x, z, 0.6, 0.6, 0));
   const bushes = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true }), bu.length * 2);
   let bi = 0;
   bu.forEach(([x, h, z]) => {

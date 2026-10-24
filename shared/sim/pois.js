@@ -1,7 +1,7 @@
 // Hand-built layouts for every point of interest, plus the scattered trees,
 // rocks, cars and wild chests between them. These are World methods (they use
 // its builder, colliders and loot spots); they live here to keep world.js small.
-import { POIS, TERRAIN_SIZE, distToRoad } from './terrain.js';
+import { POIS, TERRAIN_SIZE, distToRoad, biomeAt } from './terrain.js';
 
 // Same seeded stream the World build uses; set by bindPoiRandom() at build time.
 let R = null;
@@ -16,7 +16,8 @@ class PoiBuilders {
   buildPrison() {
     this.sb.mat = 'brick';
     // Rebirth's landmark: a hilltop cell block inside a walled yard.
-    const cx = 0, cz = -15;
+    const pp = POIS.find((q2) => q2.id === 'prison');
+    const cx = pp.x, cz = pp.z;
     this.building({ x: cx, z: cz - 12, w: 46, d: 18, floors: 3, color: '#cfc8b8', trim: '#8a8172', roofColor: '#7d776d', doors: ['s', 'e', 'w'], poi: 'prison' });
     this.building({ x: cx - 30, z: cz + 12, w: 14, d: 22, floors: 2, color: '#c2b8a3', trim: '#827765', doors: ['e', 'n'], poi: 'prison' });
     this.building({ x: cx + 28, z: cz + 14, w: 16, d: 14, floors: 2, color: '#b8c4c9', trim: '#6b7a80', doors: ['w', 'n'], poi: 'prison' });
@@ -211,9 +212,102 @@ class PoiBuilders {
     for (let i = 0; i < 2; i++) this.container(p.x + rr(-14, -10), p.z + rr(-14, -9), true);
   }
 
+
+  // ---------------------------------------------------------------- new biomes
+
+  buildFrost() {
+    this.sb.mat = 'wood';
+    const p = POIS.find((q2) => q2.id === 'frost');
+    // A ski lodge with a long pitched roof, a gondola station and a few cabins.
+    this.building({ x: p.x, z: p.z, w: 22, d: 14, floors: 2, fh: 3.8, color: '#8a5a3c', trim: '#f4f8fa', floorColor: '#b78a5e', doors: ['s', 'e'], pitched: { color: '#eef4f8', rise: 4 }, roofAccess: false, poi: 'frost' });
+    for (const [dx, dz, c] of [[-22, 10, '#9c6b45'], [20, 12, '#7d4f33'], [-20, -14, '#a1744e']]) {
+      this.building({ x: p.x + dx, z: p.z + dz, w: 8, d: 8, floors: 1, fh: 3.6, color: c, trim: '#f4f8fa', doors: ['s'], pitched: { color: '#eef4f8', rise: 2.4 }, roofAccess: false, poi: 'frost' });
+    }
+    const g = this.ground(p.x + 8, p.z - 18);
+    // Gondola station: two pylons and a platform.
+    this.sb.mat = 'metal';
+    this.sb.box(p.x + 6, g, p.z - 20, p.x + 8, g + 14, p.z - 18, '#9aa7b0');
+    this.sb.box(p.x + 22, g, p.z - 20, p.x + 24, g + 14, p.z - 18, '#9aa7b0');
+    this.sb.box(p.x + 4, g + 13, p.z - 20.6, p.x + 26, g + 13.4, p.z - 17.4, '#c0392b', false);
+    for (let i = 0; i < 5; i++) this.crate(p.x + rr(-10, 12), p.z + rr(10, 18));
+    this.lootSpots.push({ x: p.x, y: this.ground(p.x, p.z + 9), z: p.z + 9, type: 'chest', poi: 'frost' });
+  }
+
+  buildMines() {
+    this.sb.mat = 'metal';
+    const p = POIS.find((q2) => q2.id === 'mines');
+    // A mine shaft cut into the ridge: timber frame, ore carts, a processing shed on stilts.
+    const g = this.ground(p.x, p.z);
+    this.sb.mat = 'wood';
+    this.sb.box(p.x - 5, g, p.z + 8, p.x - 3.5, g + 5, p.z + 9.5, '#6e4b2a');
+    this.sb.box(p.x + 3.5, g, p.z + 8, p.x + 5, g + 5, p.z + 9.5, '#6e4b2a');
+    this.sb.box(p.x - 5.5, g + 5, p.z + 7.8, p.x + 5.5, g + 6, p.z + 9.7, '#6e4b2a');
+    this.building({ x: p.x - 4, z: p.z - 8, w: 16, d: 10, floors: 2, color: '#6f6a62', trim: '#3e3a35', roofColor: '#4a4741', doors: ['s'], poi: 'mines' });
+    this.sb.mat = 'metal';
+    this.building({ x: p.x + 16, z: p.z + 2, w: 10, d: 8, floors: 1, color: '#b0a89a', trim: '#6b655b', doors: ['w'], pitched: { color: '#7a7d80', rise: 2 }, roofAccess: false, poi: 'mines' });
+    for (let i = 0; i < 6; i++) this.sb.box(p.x - 16 + i * 4, g, p.z + 14, p.x - 14 + i * 4, g + 1.2, p.z + 15.4, '#555a5e');
+    for (let i = 0; i < 4; i++) this.rock(p.x + rr(-20, 20), p.z + rr(12, 22));
+    this.lootSpots.push({ x: p.x, y: g, z: p.z + 3, type: 'chest', poi: 'mines' });
+    this.lootSpots.push({ x: p.x + 14, y: g, z: p.z - 4, type: 'floor', poi: 'mines' });
+  }
+
+  buildMesa() {
+    this.sb.mat = 'brick';
+    const p = POIS.find((q2) => q2.id === 'mesa');
+    // A flat-topped plateau with an adobe fort on top and a switchback of ramps up one side.
+    this.building({ x: p.x, z: p.z, w: 20, d: 16, floors: 2, color: '#d9a066', trim: '#a8693a', roofColor: '#c78850', doors: ['s', 'w'], poi: 'mesa' });
+    this.building({ x: p.x + 17, z: p.z + 10, w: 9, d: 9, floors: 1, color: '#e0b27a', trim: '#a8693a', doors: ['w'], roofAccess: false, poi: 'mesa' });
+    this.tower(p.x - 16, p.z - 12, 8, '#c78850', '#a8693a');
+    this.tower(p.x + 16, p.z - 12, 8, '#c78850', '#a8693a');
+    const g = this.ground(p.x, p.z + 14);
+    for (let i = 0; i < 6; i++) this.crate(p.x + rr(-14, 14), p.z + rr(12, 20));
+    this.sb.cylinder(p.x - 6, g, p.z + 16, 2, 6, '#8d6e4a');
+    this.lootSpots.push({ x: p.x, y: g, z: p.z + 12, type: 'chest', poi: 'mesa' });
+  }
+
+  buildRanch() {
+    this.sb.mat = 'wood';
+    const p = POIS.find((q2) => q2.id === 'ranch');
+    this.building({ x: p.x, z: p.z, w: 18, d: 12, floors: 2, fh: 3.8, color: '#a8452f', trim: '#f0e6d2', floorColor: '#b98a52', doors: ['s', 'n'], pitched: { color: '#6e3a2a', rise: 3.4 }, roofAccess: false, poi: 'ranch' });
+    // Big barn and a windmill.
+    this.building({ x: p.x - 24, z: p.z + 6, w: 16, d: 20, floors: 2, fh: 4.5, color: '#8c2f23', trim: '#f0e6d2', floorColor: '#b98a52', doors: ['e'], pitched: { color: '#5e2a21', rise: 4.5 }, roofAccess: false, poi: 'ranch' });
+    const wx = p.x + 22, wz = p.z - 6, g = this.ground(wx, wz);
+    this.sb.mat = 'metal';
+    this.sb.cylinder(wx, g, wz, 1.4, 12, '#9aa0a6');
+    this.sb.box(wx - 5, g + 11.4, wz - 0.2, wx + 5, g + 12, wz + 0.2, '#d9d4c7', false);
+    this.sb.box(wx - 0.2, g + 7, wz - 0.2, wx + 0.2, g + 17, wz + 0.2, '#d9d4c7', false);
+    // Fenced corral with hay.
+    for (let i = 0; i < 8; i++) this.sb.box(p.x + 8 + i * 2.2, this.ground(p.x + 8 + i * 2.2, p.z + 14), p.z + 14, p.x + 8.2 + i * 2.2, this.ground(p.x + 8 + i * 2.2, p.z + 14) + 1.2, p.z + 14.2, '#7d5a36', false);
+    for (let i = 0; i < 4; i++) this.crate(p.x + rr(-6, 14), p.z + rr(-14, -8));
+    for (let i = 0; i < 2; i++) this.car(p.x + rr(-8, 8), p.z + rr(16, 22), 0);
+    this.lootSpots.push({ x: p.x, y: this.ground(p.x, p.z + 8), z: p.z + 8, type: 'chest', poi: 'ranch' });
+  }
+
+  buildRuins() {
+    this.sb.mat = 'brick';
+    const p = POIS.find((q2) => q2.id === 'ruins');
+    // A collapsed temple: broken walls, a central stepped platform and overgrowth.
+    this.building({ x: p.x, z: p.z, w: 20, d: 20, floors: 2, color: '#8a9a82', trim: '#5a6b54', roofColor: '#6f7f68', doors: ['s', 'e', 'n'], walls: true, poi: 'ruins' });
+    const g = this.ground(p.x, p.z);
+    for (const [dx, dz] of [[-16, -16], [16, -16], [-16, 16], [16, 16]]) {
+      const h = rr(2.5, 6);
+      this.sb.cylinder(p.x + dx, this.ground(p.x + dx, p.z + dz), p.z + dz, 1.1, h, '#98a890');
+    }
+    for (let i = 0; i < 5; i++) {
+      const x = p.x + rr(-24, 24), z = p.z + rr(-24, 24);
+      if (this.free(x, z, 2, 1)) { const gg = this.ground(x, z); this.sb.box(x - 2, gg, z - 0.5, x + 2, gg + rr(1, 3), z + 0.5, '#7d8b76'); }
+    }
+    for (let i = 0; i < 6; i++) this.tree(p.x + rr(-28, 28), p.z + rr(-28, 28), 'round');
+    this.lootSpots.push({ x: p.x, y: g, z: p.z + 4, type: 'chest', poi: 'ruins' });
+    this.lootSpots.push({ x: p.x + 8, y: g, z: p.z - 6, type: 'chest', poi: 'ruins' });
+  }
+
   buildLighthouse() {
     this.sb.mat = 'brick';
-    const x = -170, z = -70;
+    // On the west coast: walk in from the sea until the ground is dry and not too steep.
+    const z = -105;
+    let x = -TERRAIN_SIZE / 2 + 20;
+    while (x < 0 && this.ground(x, z) < 2.2) x += 2;
     const g = this.ground(x, z);
     if (g < 1) return;
     this.sb.cylinder(x, g, z, 3, 16, '#f5f5f5');
@@ -227,7 +321,7 @@ class PoiBuilders {
 
   scatterNature() {
     let trees = 0, rocks = 0, cars = 0;
-    for (let tries = 0; tries < 6000 && (trees < 300 || rocks < 80); tries++) {
+    for (let tries = 0; tries < 16000 && (trees < 720 || rocks < 190); tries++) {
       const x = rr(-TERRAIN_SIZE / 2 + 20, TERRAIN_SIZE / 2 - 20);
       const z = rr(-TERRAIN_SIZE / 2 + 20, TERRAIN_SIZE / 2 - 20);
       const h = this.ground(x, z);
@@ -237,11 +331,13 @@ class PoiBuilders {
       const slope = Math.abs(this.ground(x + 1, z) - this.ground(x - 1, z)) + Math.abs(this.ground(x, z + 1) - this.ground(x, z - 1));
       if (slope > 2.2) continue;
       if (!this.free(x, z, 1.6, 1.6)) continue;
-      if (rocks < 80 && R() < 0.22) { this.rock(x, z); rocks++; }
-      else if (trees < 300) { this.tree(x, z); trees++; }
+      // Deserts are sparse: thin out the cacti so the dunes read as open ground.
+      if (biomeAt(x, z) === 'desert' && R() < 0.55) continue;
+      if (rocks < 190 && R() < 0.22) { this.rock(x, z); rocks++; }
+      else if (trees < 720) { this.tree(x, z); trees++; }
     }
     // A few abandoned cars along the "roads" between POIs.
-    for (let i = 0; i < 40 && cars < 14; i++) {
+    for (let i = 0; i < 90 && cars < 26; i++) {
       const a = POIS[Math.floor(R() * POIS.length)], b = POIS[Math.floor(R() * POIS.length)];
       if (a === b) continue;
       const t = rr(0.3, 0.7);
@@ -254,8 +350,8 @@ class PoiBuilders {
   scatterWildLoot() {
     // Chests hidden out in the trees, like Fortnite's off-POI chests.
     let n = 0;
-    for (let tries = 0; tries < 400 && n < 18; tries++) {
-      const x = rr(-180, 180), z = rr(-170, 170);
+    for (let tries = 0; tries < 1400 && n < 44; tries++) {
+      const x = rr(-285, 285), z = rr(-265, 265);
       const g = this.ground(x, z);
       if (g < 3) continue;
       if (POIS.some((p) => Math.hypot(x - p.x, z - p.z) < p.pad + 8)) continue;

@@ -11,7 +11,8 @@ import { weakPointTexture } from './textures.js';
 
 // Instanced props that can be hidden one at a time when harvested.
 class Pool {
-  constructor(geo, mat, max, colored = false) {
+  constructor(geo, mat, max, colored = false, base = '#ffffff') {
+    this.base = base; // colour for instances that do not pick their own
     this.mesh = new THREE.InstancedMesh(geo, mat, max);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
@@ -23,7 +24,7 @@ class Pool {
   add(matrix, color) {
     const i = this.mesh.count++;
     this.mesh.setMatrixAt(i, matrix);
-    if (this.colored) this.mesh.setColorAt(i, new THREE.Color(color));
+    if (this.colored) this.mesh.setColorAt(i, new THREE.Color(color || this.base));
     return i;
   }
 
@@ -167,17 +168,17 @@ export class WorldView {
     const white = new THREE.MeshLambertMaterial({ color: '#ffffff' });
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
     this.pools = {
-      trunk: new Pool(new THREE.CylinderGeometry(0.28, 0.42, 1, 6).translate(0, 0.5, 0), lam('#8a5a2b'), 400),
-      palmTrunk: new Pool(new THREE.CylinderGeometry(0.2, 0.3, 1, 7).translate(0, 0.5, 0), lam('#a07a4f'), 300),
-      frond: new Pool(new THREE.ConeGeometry(0.6, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5), new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true }), 600, true),
-      pine: new Pool(new THREE.ConeGeometry(1, 1, 7).translate(0, 0.5, 0), lam('#2f9e48'), 800),
-      round: new Pool(new THREE.IcosahedronGeometry(1, 0), white, 900, true),
-      rock: new Pool(new THREE.DodecahedronGeometry(1, 0), white, 200, true),
-      body: new Pool(boxGeo, white, 120, true),
-      cabin: new Pool(boxGeo, lam('#2c3e50'), 60),
-      wheel: new Pool(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10).rotateZ(Math.PI / 2), lam('#1b1b1b'), 240),
-      container: new Pool(boxGeo, white, 140, true),
-      crate: new Pool(boxGeo, lam('#b37a3f'), 160),
+      trunk: new Pool(new THREE.CylinderGeometry(0.28, 0.42, 1, 6).translate(0, 0.5, 0), white, 1100, true, '#8a5a2b'),
+      palmTrunk: new Pool(new THREE.CylinderGeometry(0.2, 0.3, 1, 7).translate(0, 0.5, 0), lam('#a07a4f'), 700),
+      frond: new Pool(new THREE.ConeGeometry(0.6, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5), new THREE.MeshLambertMaterial({ color: '#ffffff', flatShading: true }), 1100, true),
+      pine: new Pool(new THREE.ConeGeometry(1, 1, 7).translate(0, 0.5, 0), white, 1800, true, '#2f9e48'),
+      round: new Pool(new THREE.IcosahedronGeometry(1, 0), white, 2000, true),
+      rock: new Pool(new THREE.DodecahedronGeometry(1, 0), white, 420, true),
+      body: new Pool(boxGeo, white, 260, true),
+      cabin: new Pool(boxGeo, lam('#2c3e50'), 130),
+      wheel: new Pool(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10).rotateZ(Math.PI / 2), lam('#1b1b1b'), 520),
+      container: new Pool(boxGeo, white, 300, true),
+      crate: new Pool(boxGeo, lam('#b37a3f'), 320),
     };
   }
 

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { fbm, smoothstep, lerp, clamp, valueNoise } from '/shared/math/util.js';
 import { WATER_LEVEL } from '/shared/config.js';
 import {
-  TERRAIN_SIZE, RES, STEP, heights, POIS, GROUND_COLORS, distToRoad, terrainHeight, poiAt,
+  TERRAIN_SIZE, RES, STEP, heights, POIS, GROUND_COLORS, distToRoad, terrainHeight, poiAt, biomeWeights,
 } from '/shared/sim/terrain.js';
 
 const groundColor = {};
@@ -27,6 +27,9 @@ export function buildTerrainMesh() {
   const foam = new THREE.Color('#f4fbff');
   const seabed = new THREE.Color('#5aa6b3');
   const c = new THREE.Color();
+  const snowC = new THREE.Color('#f2f7fa'), snowShade = new THREE.Color('#d5e3ea');
+  const desertC = new THREE.Color('#e3c283'), desertShade = new THREE.Color('#cfa766');
+  const jungleC = new THREE.Color('#2f8f3a'), jungleShade = new THREE.Color('#1f6b30');
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
@@ -46,6 +49,14 @@ export function buildTerrainMesh() {
     c.lerp(meadow, smoothstep(0.15, 0.45, m) * 0.55);
     c.lerp(clover, smoothstep(-0.2, -0.5, m) * 0.5);
     c.lerp(dirt, smoothstep(0.42, 0.6, fbm(x * 0.03 - 9, z * 0.03 + 21, 2)) * 0.75);
+    // Biome ground: blends across the soft border weights.
+    const bw = biomeWeights(x, z);
+    const bn = fbm(x * 0.04, z * 0.04, 2) * 0.5 + 0.5;
+    if (h > 1) {
+      c.lerp(snowC.clone().lerp(snowShade, bn), bw.snow * 0.95);
+      c.lerp(desertC.clone().lerp(desertShade, bn), bw.desert * 0.95);
+      c.lerp(jungleC.clone().lerp(jungleShade, bn), bw.jungle * 0.85);
+    }
     c.multiplyScalar(0.94 + valueNoise(x * 0.9, z * 0.9) * 0.06);
     if (h < 2.2) c.copy(sand).lerp(c, smoothstep(1.2, 2.2, h));
     if (h < 0.3) c.copy(wetSand);
@@ -75,7 +86,7 @@ export function buildTerrainMesh() {
 export function buildWater() {
   // Subdivided near the island so the waves have vertices to move; the far
   // ocean is a flat skirt.
-  const geo = new THREE.PlaneGeometry(900, 900, 150, 150);
+  const geo = new THREE.PlaneGeometry(1000, 1000, 160, 160);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshPhongMaterial({
     color: '#27b3e6', transparent: true, opacity: 0.8, shininess: 110, specular: '#d8f6ff',
@@ -100,7 +111,7 @@ export function buildWater() {
   mesh.position.y = WATER_LEVEL;
   mesh.receiveShadow = true;
   const skirt = new THREE.Mesh(
-    new THREE.RingGeometry(440, 2400, 48, 1).rotateX(-Math.PI / 2),
+    new THREE.RingGeometry(490, 2600, 48, 1).rotateX(-Math.PI / 2),
     new THREE.MeshPhongMaterial({ color: '#1f9fd6', shininess: 60, specular: '#bdeeff' }),
   );
   skirt.position.y = -0.05;
@@ -128,6 +139,10 @@ export function paintMinimap(canvas) {
       } else {
         const shade = clamp(h / 40, 0, 1);
         r = lerp(95, 70, shade); g = lerp(200, 150, shade); b = lerp(75, 60, shade);
+        const bw = biomeWeights(x, z);
+        r = lerp(r, 240, bw.snow); g = lerp(g, 246, bw.snow); b = lerp(b, 250, bw.snow);
+        r = lerp(r, 226, bw.desert); g = lerp(g, 192, bw.desert); b = lerp(b, 128, bw.desert);
+        r = lerp(r, 40, bw.jungle * 0.8); g = lerp(g, 125, bw.jungle * 0.8); b = lerp(b, 55, bw.jungle * 0.8);
       }
       const poi = poiAt(x, z);
       if (poi && Math.hypot(x - poi.x, z - poi.z) < poi.pad - 2 && h >= WATER_LEVEL) {

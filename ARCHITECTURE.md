@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 1 to 7 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 to 9 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -65,6 +65,10 @@ All rules are pure data in `shared/economy/` (coin table, shop rotation, challen
 ## Weapons, projectiles and drops (Phase 7)
 
 Weapons are rows in `config.WEAPONS`; behaviour flags are `burst` (queue of follow-up rounds ticked in `Combat.updateBurst`), `pellets`, `projectile` (rocket) and `scope`. Adding a gun is: a config row, a name, a loot weight, `gunMesh` case, icon, `classOfWeapon` entry (a test enforces the last two). Rockets and grenades live in `combat.rockets` / `combat.grenades` on the server and are drawn on every client from `projSpawn` (position, velocity, life) and `projEnd` events, so the replica never has to tick combat. Supply drops are chests with `falling: true` that the loot system lowers each tick, broadcasting `chestMoved` every 6th tick; a `supplyDrop` event (and the welcome message for late joiners) creates the chest on replicas.
+
+## The island and biomes (Phase 9)
+
+`shared/sim/terrain.js` owns the 840 m heightmap (`MAP_SCALE` 1.5 over the original), the 17 `POIS`, roads, and `biomeWeights(x, z)` / `biomeAt`. Biomes are a pure function of position with noise-warped borders; the sim uses them to pick tree and rock types, the renderer uses the weights to blend ground colour. Terrain is still a module-level singleton baked at import, so there is exactly one map per process. Adding a place: a row in `POIS`, a `build<Name>` in `pois.js`, a call in `World.build`, and (if it needs a road) a `ROAD_LINKS` pair.
 
 ## Module map: where everything moves
 
