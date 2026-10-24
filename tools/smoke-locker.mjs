@@ -20,7 +20,7 @@ await page.click('#locker-grid .tile:not(.locked)');
 await page.click('#locker-slots [data-slot="emote2"]');
 const locked = await page.$$eval('#locker-grid .tile.locked', (t) => t.length);
 await page.waitForTimeout(6000);
-await page.screenshot({ path: process.env.SHOT || 'locker.png' });
+await page.screenshot({ path: process.env.SHOT || '/tmp/locker.png' });
 await page.click('#locker-close');
 await page.click('#shop-btn'); await page.waitForSelector('#shop-body .shop-msg'); await page.click('#shop-close');
 await page.click('#chal-btn'); await page.waitForSelector('#chal-body .shop-msg'); await page.click('#chal-close');

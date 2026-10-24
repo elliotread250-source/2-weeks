@@ -1,109 +1,94 @@
 # Two Weeks
 
-A third-person build-and-shoot battle royale that runs in the browser. The map is a Rebirth Island style island (Call of Duty: Warzone's small Resurgence map) dressed up in Fortnite's look: bright greens, sandy beaches, cartoon buildings, a Drop Bus and gliders.
+A third-person build-and-shoot battle royale that runs in the browser. Drop from the Drop Bus onto an 840 m island with four biomes and 17 named places, farm materials, build and edit, loot rarity-coloured guns, and be the last one standing. Play offline against bots, or online in a shared room with a server-authoritative simulation.
 
-You drop in with a pickaxe, 100 health and 100 shield against 24 bots. Farm materials, build, edit, loot rarity-coloured guns and outlast the storm.
+Everything you see is generated in code: characters, outfits, pickaxes, gliders, icons, sounds and music. There are no art or audio files to download, and no third-party names or artwork.
+
+Live: https://two-weeks-production.up.railway.app
 
 ## Run it
 
 ```bash
 npm install
-npm start
-# open http://localhost:3000
+npm start          # http://localhost:3000
+npm test           # node:test suite (database tests need Postgres, see below)
 ```
 
-No build step. `server.js` is a zero-dependency static server. It serves `/public`, the shared simulation at `/shared` and three.js from `node_modules` at `/vendor/three`, so the game never relies on a CDN. `/health` returns `ok` for Railway's health check.
+No build step. `server.js` serves `/public`, the shared simulation at `/shared` and three.js from `node_modules` at `/vendor/three`, so the game never depends on a CDN.
+
+Smoke tests (headless Chromium, software rendering, so slow but real):
 
 ```bash
-npm test                 # node:test suite for the simulation
-node tools/smoke.mjs     # headless-browser smoke test (add --deep for a scripted match)
+node tools/smoke.mjs http://localhost:3000 /tmp/shot.png --deep   # scripted offline match through the real client
+node tools/smoke-online.mjs                                        # two browsers against one server
+node tools/smoke-locker.mjs                                        # locker, shop and challenge screens, then a match
+node tools/smoke-quality.mjs http://localhost:3000 low epic        # each graphics preset
+node tools/soak.mjs 32 10                                          # headless 32-bot, 10 minute match: tick cost and memory
 ```
 
-## Online play
+Set `CHROMIUM_PATH` if Playwright cannot find a browser.
 
-PLAY ONLINE joins a room on the same server (`/ws` on the HTTP port). Rooms hold 32 fighters; humans queue in a lobby and bots fill the rest when it is full or the 60 second timer ends. Disconnect and the server keeps your fighter for 30 seconds (10 of them invulnerable); reloading the page resumes it.
+## Deploying (Railway)
+
+Push to GitHub, open a pull request into the default branch, merge. Railway builds from the repo (`railway.json`, Railpack) and health-checks `/health`. Then check the deploy logs and the live URL.
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | 3000 | HTTP and WebSocket port (Railway sets it) |
-| `MAX_PLAYERS_PER_ROOM` | 32 | humans plus bots per match |
-| `LOBBY_SECONDS` | 60 | how long a lobby waits before bots fill it |
-| `HUMAN_TARGET` | room capacity | start immediately once this many humans joined |
+| `DATABASE_URL` | none | Postgres. Without it the game works; accounts, coins and the shop show "Can't reach the server right now" |
+| `SESSION_SECRET` | none | Signs session tokens. Set it, or sessions end on every restart |
+| `NODE_ENV` | | `production` makes the session cookie `Secure` |
+| `MAX_PLAYERS_PER_ROOM` | 32 | Humans plus bots per match |
+| `LOBBY_SECONDS` | 60 | How long a lobby waits before bots fill it |
+| `HUMAN_TARGET` | room capacity | Start at once when this many humans have joined |
 
-`/health` is the Railway health check. `/health/full` also lists live rooms with average and max tick time.
+The tick rate (30 Hz) is a shared constant, not an environment variable: the client predicts with the same number, so changing it on the server alone would break prediction.
 
-Network tools: `node tools/netsim.mjs --listen 4000 --target ws://localhost:3000/ws --latency 150 --jitter 20 --loss 0.02` puts a laggy lossy proxy in front of the server; `node tools/soak.mjs 32 10` runs a headless 32-bot, 10 minute match and prints tick cost; `node tools/smoke-online.mjs` plays two headless browsers against each other.
+`/health` answers `ok`. `/health/full` lists live rooms with average and worst tick time and the database state. Database tables live in the `twoweeks` schema, so the Postgres can be shared with other games.
 
-## Code layout
+Hobby plan sizing, measured with `node tools/loadtest.mjs 32 40` (the real server, 32 WebSocket clients sprinting and shooting, on a shared sandbox core): about 10% of one CPU core, 125 MB of RAM, 2.1 ms average tick (6% of the 33 ms budget, worst 18 ms) and 13 KB/s of downstream per player. A bots-only room costs less (`tools/soak.mjs`: 0.2 ms per tick). Those are sandbox numbers; Railway's shared vCPU will differ, so watch `/health/full`. Set a spending limit on the Railway project.
 
-`server/` is the authoritative game server (rooms, matchmaking, rate limits). `shared/` is the whole game simulation with no rendering and no DOM, so it runs in Node and the browser. `public/js/` is the client: `render/` draws sim state, `client/` turns input into sim commands and sim events into visuals and sound, `ui/` is the HUD and menus. See ARCHITECTURE.md and PROGRESS.md.
+## Architecture in one paragraph
+
+`shared/` is the whole game simulation with no rendering and no DOM; it runs in Node (server, tests) and in the browser (offline play, and client prediction online). `server/` runs one authoritative `Match` per room at 30 Hz, accepts binary commands over a WebSocket, sends delta snapshots at 20 Hz, and owns accounts, the coin ledger, the shop and challenges in Postgres. `public/js/` draws sim state (`render/`), turns input into commands and events into visuals and sound (`client/`), and runs the menus and HUD (`ui/`). Read `ARCHITECTURE.md` for the details and `PROGRESS.md` for what each phase did and did not finish.
 
 ## Controls
 
 | Key | Action |
 | --- | --- |
-| WASD / Shift | Move / sprint |
+| WASD / Shift / Ctrl | Move / sprint / crouch |
 | Space | Jump, leave the bus, open the glider |
-| Mouse | Look. LMB fire or place, RMB aim down sights |
-| 1 | Pickaxe |
-| 2-6 or wheel | Inventory slots |
-| Q | Toggle build mode |
-| Z X C V (or F1-F4) | Wall, floor, ramp, cone |
-| RMB or T in build mode | Cycle wood / brick / metal |
-| F | Edit the build you're looking at. Hold LMB over tiles, let go to confirm (or F again if you turn confirm-on-release off). RMB resets |
-| E | Pick up, hold to open chests and ammo boxes |
+| Mouse | Look. LMB fire, place or select tiles; RMB aim down sights |
+| 1 to 6 or wheel | Pickaxe and inventory slots |
+| Q, then Z X C V | Build mode, then wall, floor, ramp, cone |
+| T or RMB in build mode | Cycle wood / brick / metal |
+| F | Edit the build you look at; hold LMB over tiles and release to confirm |
+| E | Pick up; hold to open chests |
 | R | Reload |
+| H / hold Tab | Drop the selected item / inventory |
+| Hold B | Emote wheel: move the mouse, release |
+| G | Swap camera shoulder |
 | M | Full map |
+| F3 | FPS, ping and draw-call overlay |
 
-Every key is rebindable from **Settings & Keybinds** in the lobby or pause menu, including mouse buttons and side buttons. Binds and settings save in your browser.
+Controller (standard layout): left stick move, right stick look, RT fire, LT aim, A jump, B crouch, X interact and reload, Y build, LB/RB slots (or material in build mode), D-pad wall/floor/ramp/cone, L3 sprint, R3 edit, Back map. Click once in the game so the browser locks the pointer, then the pad works.
 
-## What's in it
+Every keyboard bind can be changed in Settings.
 
-**Map.** Twelve POIs laid out like Rebirth Island, renamed Fortnite style: Prison Peaks (the hilltop prison block with its walled yard and guard towers), Control Corner (Control Center), Bio Bluffs (Bioweapons Labs), Chem Cove (Chemical Engineering), Factory Flats (Factory/Industry), Hazy Harbor (Harbor, with docks and container stacks), Lazy Lanes (Living Quarters as a Pleasant Park style street), HQ Heights (Headquarters with a rooftop helipad), Decon Docks (Decon Zone tents), Salty Shore, Security Sands and Crane Corner (the unfinished Construction Site). There's a lighthouse on the west coast. Every building has walkable stairs, floors and roofs.
+## What is in it
 
-**Building.** Grid-snapped walls, floors, ramps and cones on a 5 m x 3.75 m grid (Fortnite's 512 x 384 unit tile). Each piece costs 10 materials. Health values come from the Fortnite wiki: walls go 90 to 150 (wood), 90 to 300 (brick), 110 to 500 (metal) over 4 s, 11.5 s and 24.5 s, so wood goes up fast and metal ends up tanky. Pieces need to touch the ground or another build, and anything left floating collapses when its support is destroyed. Standing on your ramp while you build places the next ramp at the next level, so ramp rushing works.
+**The island.** 840 m across, 17 places over four biomes: Prison Peaks, Control Corner, Bio Bluffs, Chem Cove, Factory Flats, Hazy Harbor, Lazy Lanes, HQ Heights, Decon Docks, Salty Shore, Security Sands, Crane Corner (temperate); Frostbite Lodge and Mine Mouth (snow); Dusty Mesa and Rusty Ranch (desert); Mossy Ruins (jungle). A lighthouse on the west coast. Resurgence: you redeploy after dying until the third storm circle starts.
 
-**Editing.** Walls edit on a 3x3 tile grid (doors, windows, arches, half walls), floors on 2x2, cones on 2x2 corners, and ramps rotate by dragging across their tiles in the direction you want them to rise.
+**Building.** Walls, floors, ramps and cones on a 5 m by 3.75 m grid, 10 materials each, wood/brick/metal with different health and build time. Pieces need support and collapse without it. Hold fire to build fast. Edits on a 3x3 (walls), 2x2 (floors, cones) grid.
 
-**Harvesting.** Trees give wood, rocks give brick, cars and shipping containers give metal. Hit the blue weak point for double damage and double materials, same as Fortnite. The pickaxe also tears down builds (50 per swing) and does 20 to players.
+**Weapons.** Assault Rifle, Burst Rifle, SMG, Pistol, Revolver, Pump Shotgun, Tactical Shotgun, Marksman Rifle, Bolt-Action Sniper, Rocket Launcher; Frag Grenades. Five rarities, headshots, falloff, bloom, recoil. Supply drops fall into the next circle when a storm phase begins.
 
-**Weapons.** Common, Uncommon, Rare, Epic and Legendary rarities with Fortnite's colours and damage curves. Assault Rifle (30 to 36), Pump Shotgun, SMG, Pistol, Bolt-Action Sniper (scoped, Rare and up) and Rocket Launcher (Epic and up, wrecks builds). Headshot multipliers, bloom, ADS accuracy and shotgun falloff are all in. Ammo types: light, medium, heavy, shells, rockets.
+**Cosmetics.** About 250 items: 68 outfits (with styles and recolours), back blings, pickaxes, gliders, contrails, weapon wraps, 25 emotes, banners, loading screens. The Locker previews them on a live 3D character.
 
-**Healing.** Bandages (+15 up to 75), Med Kit (to 100), Small Shield Potions (+25 up to 50), Shield Potions (+50) and the Big Jug.
+**Coins.** Eliminations, assists, placement and survival pay Coins. The Item Shop rotates at 00:00 UTC. 46 challenges (daily, weekly, milestones). Offline matches pay half, with a daily cap.
 
-**Loot.** Floor loot, gold chests, ammo boxes, and full loot explosions when someone is eliminated. Ammo and materials auto-pick up.
+**Graphics.** Auto, Low, Medium, High, Epic, plus dynamic resolution. Auto never picks Epic.
 
-**Match flow.** Drop Bus over a random route, skydive (look down and hold W to dive), glider auto-deploys near the ground. Six storm phases. Storm damage skips your shield like it does in Fortnite. Resurgence, the Rebirth Island signature, keeps redeploying you for the first three circles; after that, deaths are final. Last one standing gets the #1 VICTORY!.
+## Honest limits
 
-**Bots.** They pick a POI off the bus, loot, farm mats, fight with range-appropriate weapons, throw up walls and ramps when shot, heal when safe, rotate from the storm, and ramp over things they get stuck on.
-
-## Research notes
-
-Numbers in `public/js/config.js` are based on:
-
-- Fortnite build health and build times: wood/brick/metal walls 90-150 / 90-300 / 110-500, floors, ramps and roofs 84-140 / 93-280 / 101-460, build times 4 / 11.5 / 24.5 seconds ([GameRevolution](https://www.gamerevolution.com/?p=410337)).
-- Fortnite rarity colours and Assault Rifle damage of 30 / 31 / 33 / 35 / 36 by rarity, Pump Shotgun scaling from 90 ([Dot Esports](https://dotesports.com/news/full-stats-of-all-fortnite-battle-royale-weapons), [Pocket Gamer](https://www.pocketgamer.com/articles/077032/r/)).
-- Rebirth Island's drop locations and layout: Prison Block, Control Center, Bioweapons Labs, Chemical Engineering, Factory, Harbor, Construction Site, Shore, Security Area, Living Quarters, Headquarters and Decon Zone ([Call of Duty Wiki](https://callofduty.fandom.com/wiki/Rebirth_Island_(Warzone)), [GGRecon](https://www.ggrecon.com/guides/call-of-duty-warzone-rebirth-island-guide/), [Charlie Intel](https://www.charlieintel.com/call-of-duty-warzone/all-locations-on-rebirth-island-in-call-of-duty-warzone-73147/)).
-
-## Project layout
-
-```
-server.js            static server + /health
-railway.json         Railway build/deploy config
-public/index.html    HUD, lobby, menus
-public/css/style.css
-public/js/
-  config.js          every tunable number
-  terrain.js         island heightmap, POI list, minimap painter
-  world.js           buildings, props, harvestables, loot spots
-  collision.js       spatial hash, raycasts, character movement
-  building.js        build placement, edits, structural collapse
-  character.js       player/bot model and inventory
-  combat.js          guns, rockets, pickaxe, heals, damage
-  loot.js            chests, floor loot, pickups
-  bot.js             bot AI
-  player.js          input, camera, build/edit/combat modes
-  storm.js           storm circles
-  hud.js, fx.js, audio.js
-  game.js            match flow, bus, Resurgence, win condition
-```
+The game is verified by 112 automated tests and headless-browser smoke runs, but the renderer has only been seen through software rendering. Performance on real GPUs, weapon balance, and bot behaviour on the bigger island are untested by a human. Edits are not predicted online (placement is). Bots do not use grenades. There is one map; Resurgence is a rule on it, not a separate island.

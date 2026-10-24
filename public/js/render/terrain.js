@@ -10,8 +10,10 @@ import {
 const groundColor = {};
 for (const [k, v] of Object.entries(GROUND_COLORS)) groundColor[k] = new THREE.Color(v);
 
-export function buildTerrainMesh() {
-  const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, RES, RES);
+// stride 2 halves the grid (4 m quads): a quarter of the triangles for Low. The
+// physics grid is untouched, so the visual surface can sit a few cm off on slopes.
+export function buildTerrainMesh(stride = 1) {
+  const geo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, RES / stride, RES / stride);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   const colors = new Float32Array(pos.count * 3);
@@ -105,7 +107,10 @@ export function buildWater() {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vWave;')
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
-        gl_FragColor.rgb += vec3(0.10, 0.16, 0.18) * smoothstep(0.18, 0.36, vWave);`);
+        gl_FragColor.rgb += vec3(0.10, 0.16, 0.18) * smoothstep(0.18, 0.36, vWave);
+        // Grazing angles pick up the sky; looking straight down stays clear and deep.
+        float fres = pow(1.0 - clamp(abs(normalize(vViewPosition).z), 0.0, 1.0), 3.0);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.62, 0.84, 0.97), fres * 0.45);`);
   };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = WATER_LEVEL;

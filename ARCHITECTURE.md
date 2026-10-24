@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 1 to 9 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 to 12 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -69,6 +69,10 @@ Weapons are rows in `config.WEAPONS`; behaviour flags are `burst` (queue of foll
 ## The island and biomes (Phase 9)
 
 `shared/sim/terrain.js` owns the 840 m heightmap (`MAP_SCALE` 1.5 over the original), the 17 `POIS`, roads, and `biomeWeights(x, z)` / `biomeAt`. Biomes are a pure function of position with noise-warped borders; the sim uses them to pick tree and rock types, the renderer uses the weights to blend ground colour. Terrain is still a module-level singleton baked at import, so there is exactly one map per process. Adding a place: a row in `POIS`, a `build<Name>` in `pois.js`, a call in `World.build`, and (if it needs a road) a `ROAD_LINKS` pair.
+
+## Presentation layer (Phases 10 to 12)
+
+`client/quality.js` holds the preset table and the dynamic-resolution monitor; `Game` reads one preset row at construction (pixel ratio, shadows, fog, far plane, LOD bands, particle budget, terrain mesh stride, optional post FX from `render/post.js`). `audio/audio.js` routes every sound through a `dest` node (a per-sound stereo panner for positional sounds) into sfx and music buses under a master gain. `client/gamepad.js` is pure mapping; `InputController.pollPad` turns it into the same `trigger`/`release` calls keys use.
 
 ## Module map: where everything moves
 

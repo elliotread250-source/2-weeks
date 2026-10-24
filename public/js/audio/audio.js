@@ -1,15 +1,26 @@
 // Synthesised sound effects (WebAudio), so there are no audio files to ship.
+import { settings } from '../client/binds.js';
+
 let ctx = null;
 let master = null;
 let noiseBuf = null;
+let dest = null; // where tone()/noise() send: master, or a per-sound panner
+let sfxBus = null;
+let musicBus = null;
+const listener = { x: 0, z: 0, yaw: 0 };
 
 export function initAudio() {
   if (ctx) return;
   try {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain();
-    master.gain.value = 0.45;
     master.connect(ctx.destination);
+    sfxBus = ctx.createGain();
+    sfxBus.connect(master);
+    musicBus = ctx.createGain();
+    musicBus.connect(master);
+    dest = sfxBus;
+    setVolumes(settingsVolumes());
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -33,7 +44,7 @@ function noise(t, dur, freq, q, peak, type = 'lowpass') {
   f.Q.value = q;
   const g = ctx.createGain();
   env(g, t, 0.003, peak, dur);
-  src.connect(f).connect(g).connect(master);
+  src.connect(f).connect(g).connect(dest);
   src.start(t, Math.random() * 0.5);
   src.stop(t + dur + 0.05);
 }
@@ -45,7 +56,7 @@ function tone(t, dur, f0, f1, peak, type = 'sine') {
   o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
   const g = ctx.createGain();
   env(g, t, 0.004, peak, dur);
-  o.connect(g).connect(master);
+  o.connect(g).connect(dest);
   o.start(t);
   o.stop(t + dur + 0.05);
 }
@@ -59,11 +70,44 @@ const GUN = {
   rocket: [0.5, 500, 0.9],
 };
 
-// vol scales with distance for other players' sounds.
 const GUN_ALIAS = { tac: 'pump', burst: 'ar', dmr: 'sniper', revolver: 'pistol' };
 
-export function sfx(name, vol = 1) {
+function settingsVolumes() {
+  return { master: settings.volMaster ?? 0.8, sfx: settings.volSfx ?? 1, music: settings.volMusic ?? 0.5 };
+}
+
+export function setVolumes(v) {
+  if (!ctx) return;
+  master.gain.value = 0.45 * v.master;
+  sfxBus.gain.value = v.sfx;
+  musicBus.gain.value = 0.5 * v.music;
+}
+
+export function setListener(x, z, yaw) { listener.x = x; listener.z = z; listener.yaw = yaw; }
+
+// -1 (left) .. 1 (right) for a sound at (x, z), from the listener's point of view.
+export function panFor(x, z) {
+  const dx = x - listener.x, dz = z - listener.z;
+  const right = dx * Math.cos(listener.yaw) - dz * Math.sin(listener.yaw);
+  const dist = Math.hypot(dx, dz);
+  return Math.max(-1, Math.min(1, right / (dist + 4)));
+}
+
+// vol scales with distance for other players' sounds. `at` places the sound in the stereo field.
+export function sfx(name, vol = 1, at = null) {
   if (!ctx || vol < 0.02) return;
+  if (at && ctx.createStereoPanner) {
+    const p = ctx.createStereoPanner();
+    p.pan.value = panFor(at.x, at.z);
+    p.connect(sfxBus);
+    dest = p;
+    try { playSfx(name, vol); } finally { dest = sfxBus; }
+    return;
+  }
+  playSfx(name, vol);
+}
+
+function playSfx(name, vol) {
   name = GUN_ALIAS[name] || name;
   const t = ctx.currentTime;
   switch (name) {
@@ -74,6 +118,15 @@ export function sfx(name, vol = 1) {
       if (name === 'sniper') noise(t + 0.05, 0.6, 400, 0.5, 0.25 * vol);
       break;
     }
+    case 'step':
+      noise(t, 0.07, 700, 1.2, 0.22 * vol);
+      break;
+    case 'stepHard':
+      noise(t, 0.05, 1800, 2, 0.2 * vol, 'bandpass');
+      break;
+    case 'stepSand':
+      noise(t, 0.1, 500, 0.7, 0.18 * vol);
+      break;
     case 'pickaxe':
       noise(t, 0.08, 1200, 2, 0.5 * vol, 'bandpass');
       tone(t, 0.1, 220, 120, 0.35 * vol, 'square');
@@ -146,4 +199,64 @@ export function sfx(name, vol = 1) {
       break;
     default:
   }
+}
+
+// ---------------------------------------------------------------- music
+// Procedural, so there is nothing to download: a slow pad over a four-chord
+// loop plus a sparse pluck line. Calm in the lobby, thinner during a match.
+const CHORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]; // Am F C G (MIDI)
+const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+let musicTimer = null;
+let musicStep = 0;
+let musicMood = null;
+let musicNext = 0;
+
+function padNote(t, midi, dur, peak) {
+  const o = ctx.createOscillator();
+  o.type = 'triangle';
+  o.frequency.value = hz(midi);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + dur * 0.35);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(musicBus);
+  o.start(t);
+  o.stop(t + dur + 0.05);
+}
+
+function pluck(t, midi, peak) {
+  const o = ctx.createOscillator();
+  o.type = 'sine';
+  o.frequency.value = hz(midi + 12);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  o.connect(g).connect(musicBus);
+  o.start(t);
+  o.stop(t + 1);
+}
+
+export function startMusic(mood = 'lobby') {
+  if (!ctx) return;
+  if (musicMood === mood && musicTimer) return;
+  stopMusic();
+  musicMood = mood;
+  musicNext = ctx.currentTime + 0.1;
+  const beat = mood === 'lobby' ? 1.6 : 2.2;
+  musicTimer = setInterval(() => {
+    while (musicNext < ctx.currentTime + 0.6) {
+      const chord = CHORDS[Math.floor(musicStep / 2) % CHORDS.length];
+      if (musicStep % 2 === 0) for (const n of chord) padNote(musicNext, n, beat * 2.2, mood === 'lobby' ? 0.09 : 0.05);
+      if (mood === 'lobby' || musicStep % 4 === 1) pluck(musicNext + beat * 0.5, chord[(musicStep * 2 + 1) % 3], mood === 'lobby' ? 0.07 : 0.04);
+      musicStep++;
+      musicNext += beat;
+    }
+  }, 250);
+}
+
+export function stopMusic() {
+  clearInterval(musicTimer);
+  musicTimer = null;
+  musicMood = null;
 }

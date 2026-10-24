@@ -91,6 +91,7 @@ export class WorldView {
     this.scene = scene;
     this.world = world;
     this.detail = opts.detail || 'high';
+    this.terrainStride = opts.terrainStride || 1;
     this.ranges = new Map(); // element id -> [[vertexStart, count]]
     this.shaking = [];
     this.hv = new Map(); // harvestable id -> [{pool, index, m}]
@@ -101,7 +102,7 @@ export class WorldView {
 
   build() {
     const { scene, world } = this;
-    scene.add(buildTerrainMesh());
+    scene.add(buildTerrainMesh(this.terrainStride));
     this.water = buildWater();
     scene.add(this.water);
     addRoads(scene);

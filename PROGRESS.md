@@ -141,9 +141,42 @@ Not done / to check:
 - New places use the existing building helpers, so they are less hand-crafted than the originals. Needs a visual pass on real hardware.
 - On the bigger map 32 bots spread out; matches take longer to produce kills early. Tune bot drop spots and storm timing after real play.
 
-## Next: Phase 10 (look and feel, performance presets)
+## Phase 10: look, feel and performance (done 2026-10-24)
 
-Not started.
+Done:
+- Four quality presets (Low, Medium, High, Epic) plus Auto, in `client/quality.js`. Each row sets pixel ratio cap, shadows and shadow map size, fog and view distance, grass detail, terrain mesh stride, character LOD bands, particle budget and post FX. Auto reads the GPU string, core count and memory: software rendering and phones get Low, Intel integrated gets Low or Medium, discrete or Apple GPUs get Medium or High. It never picks Epic.
+- Dynamic resolution: a frame-time monitor lowers the render scale by 0.1 when frames run 25% over target (33 ms on Low, 17 ms elsewhere) and creeps it back up by 0.05 when there is headroom. Floor is per preset. Tested.
+- FPS overlay (F3 or the settings checkbox): fps, worst frame, preset and scale, draw calls, triangles, ping.
+- Epic only: bloom and a colour grade via EffectComposer, loaded lazily; any failure falls back to plain rendering.
+- Look: animated storm wall shader (scrolling streaks, brighter at the base), sun glow and haze in the sky, grazing-angle sky tint on the water, Low uses a half-resolution terrain mesh (cuts about 40% of triangles).
+- Settings: quality select, dynamic resolution, FPS overlay. Old shadows/detail toggles removed.
+
+Not done / honest limits:
+- All numbers above come from a software renderer. I have not seen 60 fps on a mid-range laptop or 30 on a weak one with my own eyes; the presets are my estimate and Auto is a guess. This is the first thing to check on real hardware (turn on F3).
+- No separate day/night cycle or weather.
+
+## Phase 11: HUD, lobby, audio (done 2026-10-24)
+
+Done:
+- Lobby is now tabbed: PLAY, LOCKER, ITEM SHOP, CHALLENGES, CAREER, SETTINGS. Career shows lifetime stats (matches, wins, win rate, top 10, eliminations, K/D, damage, time alive, coins) and the last 12 online matches from the database.
+- Audio: sounds are placed in the stereo field by direction, footsteps for everyone nearby (sand, hard ground and grass sound different, crouching is quieter), master/effects/music sliders, and a procedural ambient music loop (calmer lobby version, thinner match version). No audio files to download.
+- HUD: low-health red heartbeat at the screen edge. Controls list shows the new binds (drop, inventory, emote wheel, FPS).
+- Tests: 112 pass.
+
+Not done: kill feed icons, a per-weapon reticle pass, spectate-cycling UI. Music is deliberately simple; it will not win awards.
+
+## Phase 12: controller, load test, docs (done 2026-10-24)
+
+Done:
+- Gamepad support (standard mapping) feeding the same action path as the keyboard: sticks with a radial deadzone and a look curve, triggers, face buttons, bumpers for slots or material, D-pad for build pieces. Pure mapping code is unit tested (`tests/gamepad.test.js`).
+- `tools/loadtest.mjs`: real server in a child process plus N WebSocket clients. Measured with 32 clients: about 10% of one core, 125 MB RSS, 2.1 ms average tick (worst 18 ms), 13 KB/s per client downstream. The headless 32-bot soak (`tools/soak.mjs`) runs a 12 minute match at 0.18 ms average, 133 MB.
+- README rewritten for the real game (run, deploy, env vars, controls, measured sizing, limits). Stray screenshot removed from the repo.
+- Two-client online play, resume, prediction under loss and the real-client-against-real-server tests were already in the suite; they still pass.
+
+Not done / for you:
+- Spending limit: I could not read or set it through the Railway tools. Please confirm one exists on the `arcade` project.
+- Controller is untested on a physical pad (no pad in the sandbox); the mapping is tested, the feel is not.
+- `main` branch was never created (you did not answer); Railway still deploys `claude/intelligent-heisenberg-y496j2`.
 
 ## Known bugs
 

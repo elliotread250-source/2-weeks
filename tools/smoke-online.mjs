@@ -14,7 +14,7 @@ async function player(name) {
   page.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(`${name}: ${m.text()}`); });
   page.on('pageerror', (e) => errors.push(`${name} pageerror: ${e.message}`));
   await page.goto(url, { waitUntil: 'load' });
-  await page.evaluate(() => { localStorage.setItem('twoweeks.settings.v1', JSON.stringify({ shadows: false, detail: 'low' })); });
+  await page.evaluate(() => { localStorage.setItem('twoweeks.settings.v1', JSON.stringify({ quality: 'low' })); });
   await page.fill('#player-name', name);
   await page.click('#online-btn');
   return page;

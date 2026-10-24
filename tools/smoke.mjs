@@ -15,7 +15,7 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 await page.goto(url, { waitUntil: 'load' });
 await page.click('#play-btn');
 await page.waitForFunction(() => window.__game && window.__game.running, null, { timeout: 60000 });
-await page.evaluate(() => { localStorage.setItem('twoweeks.settings.v1', JSON.stringify({ shadows: false, detail: 'low' })); });
+await page.evaluate(() => { localStorage.setItem('twoweeks.settings.v1', JSON.stringify({ quality: 'low' })); });
 await page.waitForFunction(() => window.__game.match.tickCount >= 90, null, { timeout: 90000 });
 const state = await page.evaluate(() => {
   const g = window.__game;

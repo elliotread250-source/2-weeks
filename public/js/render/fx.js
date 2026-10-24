@@ -76,7 +76,7 @@ export class FX {
   // support (they drop) rather than ones smashed apart (they burst).
   shatter(min, max, matOrColor, opts = {}) {
     const w = max.x - min.x, h = max.y - min.y, d = max.z - min.z;
-    const budget = 420 - this.debris.length;
+    const budget = (this.maxDebris || 420) - this.debris.length;
     if (budget <= 0) return;
     const split = (len) => Math.max(1, Math.min(3, Math.round(len / 1.3)));
     let nx = split(w), ny = split(h), nz = split(d);

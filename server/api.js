@@ -114,6 +114,10 @@ export function createApi({ db, accounts }) {
           const bonus = economy ? await economy.dailyLogin(u.id) : 0; // first visit of the UTC day only
           return json(res, 200, { ...(await accounts.profile(u.id)), dailyLogin: bonus });
         }
+        case 'GET /api/career': {
+          const u = await need(token);
+          return json(res, 200, await economy.career(u.id));
+        }
         case 'GET /api/shop': {
           const u = await need(token);
           return json(res, 200, await economy.shop(u.id));

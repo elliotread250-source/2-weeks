@@ -21,6 +21,25 @@ export class Economy {
     return r.applied ? ECONOMY.dailyLogin : 0;
   }
 
+  // ------------------------------------------------------------ career
+
+  async career(userId) {
+    const [s, m] = await Promise.all([
+      this.db.query('SELECT matches, wins, top10, kills, damage, time_alive_s FROM stats WHERE user_id = $1', [userId]),
+      this.db.query(
+        `SELECT mp.placement, mp.kills, mp.damage, mp.survival_s, mp.coins_earned, mt.ended_at, mt.humans, mt.bots
+         FROM match_players mp JOIN matches mt ON mt.id = mp.match_id WHERE mp.user_id = $1 ORDER BY mt.id DESC LIMIT 12`,
+        [userId],
+      ),
+    ]);
+    const st = s.rows[0] || { matches: 0, wins: 0, top10: 0, kills: 0, damage: 0, time_alive_s: 0 };
+    const n = (v) => Number(v);
+    return {
+      stats: { matches: n(st.matches), wins: n(st.wins), top10: n(st.top10), kills: n(st.kills), damage: n(st.damage), timeAliveS: n(st.time_alive_s) },
+      recent: m.rows.map((r) => ({ placement: r.placement, kills: r.kills, damage: r.damage, survivalS: r.survival_s, coins: r.coins_earned, at: r.ended_at, players: r.humans + r.bots })),
+    };
+  }
+
   // ------------------------------------------------------------ shop
 
   async shop(userId, now = Date.now()) {

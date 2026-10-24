@@ -24,7 +24,7 @@ button:active { transform: skewX(-8deg) translateY(4px); box-shadow: 0 2px 0 #b9
 button.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none; font-size: 22px; }
 
 /* ---------------- lobby ---------------- */
-#lobby { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; overflow-y: auto; }
+#lobby { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; }
 .lobby-bg {
   position: fixed; inset: 0;
   background: radial-gradient(ellipse at 50% 30%, #4fb4ff 0%, #2a63d6 45%, #1b2f8a 100%);
@@ -33,7 +33,7 @@ button.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none;
   content: ''; position: absolute; inset: 0;
   background: repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 40px, transparent 40px 80px);
 }
-.lobby-content { position: relative; text-align: center; padding: 24px 16px; max-width: 980px; width: 100%; }
+.lobby-content { position: relative; text-align: center; padding: 84px 16px 24px; max-width: 980px; width: 100%; margin: auto; }
 .logo {
   font-family: 'Luckiest Guy', sans-serif; font-size: clamp(56px, 11vw, 120px); margin: 0; line-height: 1;
   color: var(--yellow); text-shadow: 0 6px 0 #c2a514, 0 10px 30px rgba(0,0,0,.45); letter-spacing: 3px;
@@ -337,3 +337,21 @@ button.small { font-size: 16px; padding: 8px 18px; }
 .inv-cols > div > div { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .inv-cols i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
 #inventory .hint { margin: 8px 0 0; color: #9db8e8; font-size: 13px; text-align: center; }
+
+#perf { position: absolute; left: 8px; top: 8px; z-index: 35; font: 600 13px/1.2 ui-monospace, Menlo, monospace; background: rgba(0,0,0,.55); padding: 4px 8px; border-radius: 4px; color: #bff7c5; pointer-events: none; }
+
+/* ---------------- lobby tabs and career ---------------- */
+#lobby-nav { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 70vw; display: flex; gap: 6px; z-index: 5; flex-wrap: wrap; justify-content: center; }
+#lobby-nav .tab { font-size: 20px; padding: 8px 22px; background: rgba(10,20,45,.7); color: #cfe3ff; box-shadow: none; border-bottom: 4px solid transparent; transform: skewX(-8deg); }
+#lobby-nav .tab.on { background: var(--yellow); color: #111; border-bottom-color: #b9a422; }
+#lobby-nav .tab:hover { filter: brightness(1.25); transform: skewX(-8deg); }
+#career-body { max-width: 900px; width: 100%; margin: 0 auto; }
+.career-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.career-card { background: rgba(255,255,255,.07); border-radius: 8px; padding: 12px 14px; }
+.career-card b { display: block; font: 700 30px Oswald, sans-serif; color: var(--yellow); }
+.career-card span { font: 500 14px Oswald, sans-serif; color: #9db8e8; }
+.career-table { width: 100%; border-collapse: collapse; font: 600 16px Oswald, sans-serif; }
+.career-table th { text-align: left; color: #9db8e8; font-weight: 500; padding: 4px 8px; }
+.career-table td { padding: 6px 8px; border-top: 1px solid #fff2; }
+.career-table td.win { color: var(--yellow); }
+@media (max-width: 700px) { #lobby-nav .tab { font-size: 15px; padding: 6px 12px; } }
