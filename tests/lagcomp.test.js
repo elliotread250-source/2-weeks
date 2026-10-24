@@ -13,21 +13,21 @@ function setup() {
   shooter.slots[0] = { kind: 'weapon', type: 'ar', rarity: 3, mag: 30 };
   shooter.selected = 1;
   shooter.ammo.medium = 90;
-  shooter.pos.set(-60, 0, 60); shooter.pos.y = m.collision.terrainHeight(-60, 60);
+  shooter.pos.set(-150, 0, 60); shooter.pos.y = m.collision.terrainHeight(-150, 60);
   return { m, shooter, target };
 }
 
 test('rewinding to the shooter\'s view time hits a target that has since moved', () => {
   const { m, shooter, target } = setup();
   // Target stands at x=-56 for 10 ticks, then steps 3 m sideways.
-  target.pos.set(-56, 0, 30); target.pos.y = m.collision.terrainHeight(-56, 30);
+  target.pos.set(-146, 0, 30); target.pos.y = m.collision.terrainHeight(-146, 30);
   for (let i = 0; i < 10; i++) { m.recordHistory(); m.tickCount++; }
   const viewTick = m.tickCount - 1;
-  target.pos.x = -53;
+  target.pos.x = -143;
   m.recordHistory(); m.tickCount++;
 
   const eye = new Vec3(shooter.pos.x, shooter.pos.y + 1.7, shooter.pos.z);
-  const aim = new Vec3(-56 - eye.x, target.pos.y + 1 - eye.y, 30 - eye.z).normalize();
+  const aim = new Vec3(-146 - eye.x, target.pos.y + 1 - eye.y, 30 - eye.z).normalize();
   m.rng.random = () => 0.5;
 
   shooter.bloom = 0;

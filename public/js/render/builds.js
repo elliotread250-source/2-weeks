@@ -7,6 +7,7 @@ import { GRID, CONE_RISE, FLOOR_T, coneHeights } from '/shared/sim/building.js';
 import { getTextures } from './textures.js';
 
 const T = TILE, H = LEVEL_H;
+const GROW_TIME = 0.28;
 const DIR_ROT = [Math.PI / 2, -Math.PI / 2, 0, Math.PI];
 
 function tileUV(g, cols, rows, c, r) {
@@ -78,6 +79,7 @@ export class BuildView {
     this.hooks = hooks; // {destroyed(piece, mode, mat)}
     this.views = new Map(); // piece id -> {group, dmgMat}
     this.shaking = [];
+    this.growing = [];
     this.time = 0;
     const tex = getTextures();
     this.mats = {};
@@ -121,7 +123,9 @@ export class BuildView {
     const p = ev.p;
     switch (ev.type) {
       case 'buildPlaced': {
-        const v = { group: new THREE.Group(), dmgMat: null, shakeT: 0, collapsing: false };
+        // `born` drives the grow-in pop; pieces that already exist (late join) skip it.
+        const v = { group: new THREE.Group(), dmgMat: null, shakeT: 0, collapsing: false, born: ev.fresh === false || p.built ? -9 : this.time, baseY: p.baseY };
+        if (v.born > -9) this.growing.push(v);
         this.views.set(p.id, v);
         this.scene.add(v.group);
         this.fill(v, p);
@@ -164,6 +168,7 @@ export class BuildView {
         this.scene.remove(v.group);
         this.views.delete(p.id);
         this.shaking = this.shaking.filter((s) => s !== v);
+        this.growing = this.growing.filter((s) => s !== v);
         if (this.hooks.destroyed) this.hooks.destroyed(p, ev.mode, this.mats[p.mat]);
         break;
       }
@@ -172,13 +177,27 @@ export class BuildView {
   }
 
   update(dt) {
+    this.time += dt;
+    // Grow-in: a fresh piece rises from its base with a small overshoot, so
+    // placing feels like it lands rather than appears.
+    for (let i = this.growing.length - 1; i >= 0; i--) {
+      const v = this.growing[i];
+      const t = Math.min(1, (this.time - v.born) / GROW_TIME);
+      const e = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2); // easeOutBack
+      const s = Math.max(0.05, e);
+      v.group.scale.y = s;
+      v.growY = v.baseY * (1 - s);
+      v.group.position.y = v.growY;
+      if (t >= 1) { v.group.scale.y = 1; v.group.position.y = 0; v.growY = 0; this.growing.splice(i, 1); }
+    }
     for (let i = this.shaking.length - 1; i >= 0; i--) {
       const v = this.shaking[i];
       if (v.shakeT <= 0) { this.shaking.splice(i, 1); continue; }
       v.shakeT -= dt;
       const a = v.collapsing ? 0.05 : Math.max(0, v.shakeT) * 0.4;
-      v.group.position.set((Math.random() - 0.5) * a, (Math.random() - 0.5) * a * 0.5, (Math.random() - 0.5) * a);
-      if (v.shakeT <= 0) v.group.position.set(0, 0, 0);
+      const gy = v.growY || 0;
+      v.group.position.set((Math.random() - 0.5) * a, gy + (Math.random() - 0.5) * a * 0.5, (Math.random() - 0.5) * a);
+      if (v.shakeT <= 0) v.group.position.set(0, gy, 0);
     }
   }
 

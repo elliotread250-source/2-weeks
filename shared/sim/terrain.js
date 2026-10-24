@@ -3,14 +3,16 @@
 import { fbm, smoothstep, lerp, clamp, valueNoise } from '../math/util.js';
 import { WATER_LEVEL } from '../config.js';
 
-export const TERRAIN_SIZE = 560;
-export const RES = 280; // segments per side
+// The island is 1.5x the first version: 840 m across at the same 2 m grid.
+export const MAP_SCALE = 1.5;
+export const TERRAIN_SIZE = 840;
+export const RES = 420; // segments per side
 export const STEP = TERRAIN_SIZE / RES;
 
 // Points of interest. Rebirth Island names on the left, Fortnite-style
 // alliterative names in game. `pad` is the flattened radius and `ground`
 // tints the flattened area.
-export const POIS = [
+const BASE_POIS = [
   { id: 'prison', name: 'Prison Peaks', rebirth: 'Prison Block', x: 0, z: -15, pad: 52, height: 30, ground: 'concrete' },
   { id: 'control', name: 'Control Corner', rebirth: 'Control Center', x: -18, z: 62, pad: 24, height: 19, ground: 'concrete' },
   { id: 'bio', name: 'Bio Bluffs', rebirth: 'Bioweapons Labs', x: 95, z: -100, pad: 26, height: 12, ground: 'concrete' },
@@ -25,6 +27,17 @@ export const POIS = [
   { id: 'construction', name: 'Crane Corner', rebirth: 'Construction Site', x: 88, z: 30, pad: 22, height: 13, ground: 'dirt' },
 ];
 
+// Everything above is scaled out to the bigger island; the new places are
+// authored in final coordinates, one or two per biome.
+export const POIS = [
+  ...BASE_POIS.map((p) => ({ ...p, x: Math.round(p.x * MAP_SCALE), z: Math.round(p.z * MAP_SCALE) })),
+  { id: 'frost', name: 'Frostbite Lodge', x: -100, z: -205, pad: 28, height: 16, ground: 'snow', biome: 'snow' },
+  { id: 'mines', name: 'Mine Mouth', x: 190, z: -190, pad: 26, height: 22, ground: 'dirt', biome: 'snow' },
+  { id: 'mesa', name: 'Dusty Mesa', x: 262, z: -10, pad: 26, height: 15, ground: 'sandstone', biome: 'desert' },
+  { id: 'ranch', name: 'Rusty Ranch', x: 205, z: 140, pad: 28, height: 6, ground: 'sandstone', biome: 'desert' },
+  { id: 'ruins', name: 'Mossy Ruins', x: -210, z: 110, pad: 28, height: 9, ground: 'moss', biome: 'jungle' },
+];
+
 // Roads linking POIs, like Rebirth's service roads. Each runs from pad edge
 // to pad edge.
 const ROAD_LINKS = [
@@ -32,6 +45,7 @@ const ROAD_LINKS = [
   ['construction', 'hq'], ['hq', 'decon'], ['decon', 'bio'], ['bio', 'security'],
   ['chem', 'factory'], ['factory', 'harbor'], ['harbor', 'shore'], ['shore', 'living'],
   ['living', 'construction'], ['control', 'living'], ['control', 'factory'],
+  ['chem', 'frost'], ['frost', 'security'], ['bio', 'mines'], ['decon', 'mesa'], ['mesa', 'ranch'], ['ranch', 'living'], ['factory', 'ruins'], ['ruins', 'harbor'],
 ];
 
 export const ROADS = ROAD_LINKS.map(([a, b]) => {
@@ -60,17 +74,42 @@ export const GROUND_COLORS = {
   grass: '#62c94b',
   sand: '#f1d891',
   dirt: '#b98a52',
+  snow: '#eef4f8',
+  sandstone: '#d9b27a',
+  moss: '#5f7f4a',
 };
 
+// Biomes. Soft weights so the renderer can blend ground colour across a border;
+// `biomeAt` picks the strongest one. Borders are warped with noise so they are
+// not straight lines. Pure function of position: server and client agree.
+export function biomeWeights(x, z) {
+  const w = fbm(x * 0.011 + 5, z * 0.011 + 9, 2) * 45;
+  const snow = smoothstep(-135 + w, -185 + w, z); // north
+  const desert = smoothstep(150 + w, 195 + w, x) * (1 - snow); // east
+  const jungle = smoothstep(-100 + w, -150 + w, x) * smoothstep(20 + w, 70 + w, z) * (1 - snow) * (1 - desert); // south west
+  return { snow, desert, jungle };
+}
+
+export function biomeAt(x, z) {
+  const b = biomeWeights(x, z);
+  let best = 'temperate', v = 0.5;
+  for (const k of ['snow', 'desert', 'jungle']) if (b[k] > v) { best = k; v = b[k]; }
+  return best;
+}
+
 function baseHeight(x, z) {
-  // Rebirth is longer east-west than north-south with a rocky north coast.
-  const nx = x / 205, nz = z / 190;
-  const warp = fbm(x * 0.008 + 11, z * 0.008 - 7, 3) * 0.18;
+  // Longer east-west than north-south, rocky north coast. Noise frequencies are
+  // divided by MAP_SCALE so hills keep the same size on screen.
+  const nx = x / (205 * MAP_SCALE), nz = z / (190 * MAP_SCALE);
+  const k = 1 / MAP_SCALE;
+  const warp = fbm(x * 0.008 * k + 11, z * 0.008 * k - 7, 3) * 0.18;
   const d = Math.sqrt(nx * nx + nz * nz) + warp;
-  const land = (0.97 - d) * 30;
-  const hills = fbm(x * 0.02, z * 0.02, 4) * 6 * smoothstep(0.95, 0.6, d);
-  const ridge = Math.max(0, fbm(x * 0.01 + 50, z * 0.01, 2)) * 8 * smoothstep(0.9, 0.5, d);
-  return Math.max(-9, land + hills + ridge);
+  const land = (0.97 - d) * 30 * MAP_SCALE * 0.75;
+  const hills = fbm(x * 0.02 * k, z * 0.02 * k, 4) * 6 * smoothstep(0.95, 0.6, d);
+  const ridge = Math.max(0, fbm(x * 0.01 * k + 50, z * 0.01 * k, 2)) * 8 * smoothstep(0.9, 0.5, d);
+  // The north-east snowfield rises into the ridge the mines are cut into.
+  const peak = smoothstep(150, 40, Math.hypot(x - 190, z + 190)) * 14;
+  return Math.max(-9, land + hills + ridge + peak);
 }
 
 function rawHeight(x, z) {

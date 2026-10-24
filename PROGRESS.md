@@ -115,7 +115,33 @@ Not done / to check:
 - Weapon feel (spread, damage, fire rates) is set from memory of similar games and unplaytested on real hardware. Expect a tuning pass.
 - No weapon-specific hit sounds or shell ejection yet (Phase 11 audio).
 
-## Next: Phase 8 (building, editing, destruction)
+## Phase 8: building feel (done 2026-10-24)
+
+Audit result: most of this phase's list already existed from Phase 1 (turbo building by holding fire at 16 pieces a second, material auto-switch, 3x3 wall / 2x2 floor edit tiles with confirm-on-release, support graph with collapse, tumbling debris, per-material HP and build time).
+
+Added:
+- Grow-in pop: placed pieces rise from their base with an overshoot over 0.28 s, plus a dust puff. Late joiners skip it.
+- Nothing in the sim changed, so the 106 tests are unaffected; offline and online smoke runs exercise placement, editing and destruction through the real client.
+
+Not done (honest list):
+- Edits are still not predicted online (placement is). On a 150 ms link an edit shows up a round trip late.
+- No edit presets or double-tap shapes, no pre-fab auto-pyramid, no trap pieces. These need a design pass with real play to decide what is worth building.
+
+## Phase 9: the bigger island (done 2026-10-24)
+
+Done:
+- The island is 840 m across (was 560): same 2 m terrain grid, 17 places instead of 12, scaled roads, four biomes (temperate, snow in the north, desert in the east, jungle in the south west) as soft weights so ground colour blends across the border. Five new places: Frostbite Lodge, Mine Mouth (snow), Dusty Mesa, Rusty Ranch (desert), Mossy Ruins (jungle). The lighthouse now finds the west coast itself.
+- Biome-aware nature: snowy pines, cacti in the desert, darker jungle canopy, tinted rocks. Trees 720, rocks 190, cars 26, wild chests 44. Instancing pools sized up to match (trunks 1100, pines 1800, canopies 2000).
+- Storm circles, bus route (38 s) and world bounds scaled to the new size. Minimap and full map paint the biomes and label all 17 places.
+- Measured on this sandbox: 32-bot 5 minute match averages 0.21 ms per tick, worst 7.5 ms, 125 MB RSS (build 70 ms).
+- Tests: 107 pass (new test checks 17 places, all four biomes, and that every place sits in its declared biome).
+
+Not done / to check:
+- No separate Resurgence island and no pre-game lobby island: Resurgence is still a rule on the same map. A second map needs the terrain module to become instantiable (it is a module-level singleton baked at import), which is a real refactor, so I did not fake it.
+- New places use the existing building helpers, so they are less hand-crafted than the originals. Needs a visual pass on real hardware.
+- On the bigger map 32 bots spread out; matches take longer to produce kills early. Tune bot drop spots and storm timing after real play.
+
+## Next: Phase 10 (look and feel, performance presets)
 
 Not started.
 

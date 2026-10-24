@@ -387,7 +387,13 @@ export class Game {
       switch (ev.type) {
         case 'staticDamaged': case 'staticBroken': case 'harvestHit': case 'harvestBroken':
           this.worldView.handle(ev); break;
-        case 'buildPlaced': case 'buildChanged': case 'buildDamaged': case 'buildComplete':
+        case 'buildPlaced':
+          if (ev.fresh !== false && ev.p.type !== 'cone') {
+            const q = ev.p;
+            this.fx.burst({ x: q.gx * 5 + 2.5, y: q.baseY + 0.3, z: q.gz * 5 + 2.5 }, '#d8d2c4', 4, 2.2, 0.8);
+          }
+          // falls through
+        case 'buildChanged': case 'buildDamaged': case 'buildComplete':
         case 'buildCollapsing': case 'buildDestroyed':
           this.buildView.handle(ev); break;
         case 'pickupSpawned': case 'pickupRemoved': case 'chestPlaced': case 'chestOpened': case 'chestMoved':

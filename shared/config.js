@@ -19,7 +19,7 @@ export const MAX_MATS = 999;
 export const BUILD_RANGE = 1; // tiles in front of the player
 
 export const WATER_LEVEL = 0;
-export const WORLD_HALF = 280;
+export const WORLD_HALF = 420;
 
 export const PLAYER = {
   radius: 0.45,
@@ -156,14 +156,14 @@ export const MAT_ORDER = ['wood', 'brick', 'metal'];
 // Storm. Rebirth Island is small, so phases are short. Storm damage ignores
 // shields and goes straight to health, same as Fortnite.
 export const STORM_PHASES = [
-  { wait: 75, shrink: 50, damage: 1, radius: 150 },
-  { wait: 55, shrink: 45, damage: 1, radius: 95 },
-  { wait: 45, shrink: 40, damage: 2, radius: 58 },
-  { wait: 40, shrink: 35, damage: 5, radius: 32 },
-  { wait: 30, shrink: 30, damage: 8, radius: 15 },
+  { wait: 80, shrink: 60, damage: 1, radius: 230 },
+  { wait: 60, shrink: 50, damage: 1, radius: 145 },
+  { wait: 48, shrink: 44, damage: 2, radius: 88 },
+  { wait: 42, shrink: 38, damage: 5, radius: 48 },
+  { wait: 32, shrink: 32, damage: 8, radius: 22 },
   { wait: 25, shrink: 30, damage: 10, radius: 0 },
 ];
-export const STORM_START_RADIUS = 300;
+export const STORM_START_RADIUS = 450;
 // Rebirth Island's signature mode: you redeploy after dying while Resurgence
 // is live. It switches off when this storm phase begins.
 export const RESURGENCE_END_PHASE = 3;

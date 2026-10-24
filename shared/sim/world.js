@@ -3,7 +3,7 @@
 // build from the same seed and get identical results, so none of this is ever
 // sent over the network; the renderer reads `prims` and `harvestables` to draw it.
 import { makeBox, makeSlope } from './collision.js';
-import { terrainHeight, POIS, TERRAIN_SIZE, distToRoad } from './terrain.js';
+import { terrainHeight, POIS, TERRAIN_SIZE, distToRoad, biomeAt } from './terrain.js';
 import { addStaticDetail, addPalms } from './decor.js';
 import { mulberry32 } from '../math/util.js';
 import { Vec3, quatFromEuler, quatFromAxisAngle, quatRotateUp } from '../math/vec3.js';
@@ -190,6 +190,11 @@ export class World {
     this.buildShore();
     this.buildSecurity();
     this.buildConstruction();
+    this.buildFrost();
+    this.buildMines();
+    this.buildMesa();
+    this.buildRanch();
+    this.buildRuins();
     this.buildLighthouse();
     addStaticDetail(this);
     addPalms(this);
@@ -419,17 +424,33 @@ export class World {
     return { pool, x, y, z, sx, sy, sz, q: quatFromEuler(rx, ry, 0), color };
   }
 
-  tree(x, z, kind = R() < 0.5 ? 'pine' : 'round') {
+  tree(x, z, kind = null) {
+    const biome = biomeAt(x, z);
+    if (!kind) kind = biome === 'snow' ? 'pine' : biome === 'desert' ? 'cactus' : R() < 0.5 ? 'pine' : 'round';
     const g = this.ground(x, z);
     const s = rr(0.85, 1.35);
     const parts = [];
+    if (kind === 'cactus') {
+      // Desert stand-in for a tree: a green trunk with two arms, still harvestable wood.
+      const green = '#4f9a45';
+      parts.push(this.part('trunk', x, g - 0.2, z, 1.1 * s, 3.4 * s, 1.1 * s, 0, 0, green));
+      parts.push(this.part('trunk', x + 0.7 * s, g + 1.4 * s, z, 0.7 * s, 1.5 * s, 0.7 * s, 0, 0, green));
+      parts.push(this.part('trunk', x - 0.7 * s, g + 2.0 * s, z, 0.7 * s, 1.2 * s, 0.7 * s, 0, 0, green));
+      const r = 0.5 * s;
+      return this.addHarvest({
+        type: 'tree', mat: 'wood', hp: Math.round(110 * s), yieldPer: 7, parts, center: { x, y: g + 1.2, z },
+        collider: makeBox(x - r, g - 1, z - r, x + r, g + 4 * s, z + r, 'harvest', null),
+      });
+    }
+    const snowy = biome === 'snow' ? '#e6eff3' : null;
     const trunkH = kind === 'pine' ? 3 * s : 3.4 * s;
     parts.push(this.part('trunk', x, g - 0.2, z, s, trunkH, s));
     if (kind === 'pine') {
-      parts.push(this.part('pine', x, g + 1.6 * s, z, 2.6 * s, 3.6 * s, 2.6 * s));
-      parts.push(this.part('pine', x, g + 3.6 * s, z, 1.9 * s, 3.0 * s, 1.9 * s));
+      parts.push(this.part('pine', x, g + 1.6 * s, z, 2.6 * s, 3.6 * s, 2.6 * s, 0, 0, snowy || undefined));
+      parts.push(this.part('pine', x, g + 3.6 * s, z, 1.9 * s, 3.0 * s, 1.9 * s, 0, 0, snowy || undefined));
     } else {
-      const col = ['#4cc23e', '#59cf3f', '#3db24a', '#7fd13b'][Math.floor(R() * 4)];
+      const palette = biome === 'jungle' ? ['#2f8f3a', '#267a35', '#3aa047', '#1f6b30'] : ['#4cc23e', '#59cf3f', '#3db24a', '#7fd13b'];
+      const col = palette[Math.floor(R() * 4)];
       parts.push(this.part('round', x, g + 4.1 * s, z, 2.3 * s, 2.0 * s, 2.3 * s, R() * 6, 0, col));
       parts.push(this.part('round', x + 0.9 * s, g + 3.5 * s, z + 0.5 * s, 1.5 * s, 1.4 * s, 1.5 * s, R() * 6, 0, col));
     }
@@ -476,7 +497,9 @@ export class World {
   rock(x, z) {
     const g = this.ground(x, z);
     const s = rr(1.1, 2.0);
-    const shade = ['#a3a3a8', '#8f8f96', '#b1aca2'][Math.floor(R() * 3)];
+    const biome = biomeAt(x, z);
+    const palette = biome === 'desert' ? ['#c9a572', '#b8905e', '#d4b483'] : biome === 'snow' ? ['#c9d3da', '#b4c0c8', '#dde5ea'] : biome === 'jungle' ? ['#6f8a6a', '#5d7a5a', '#7c9578'] : ['#a3a3a8', '#8f8f96', '#b1aca2'];
+    const shade = palette[Math.floor(R() * 3)];
     const part = this.part('rock', x, g + 0.4 * s, z, s * 1.3, s, s * 1.1, R() * 6, R(), shade);
     return this.addHarvest({
       type: 'rock', mat: 'brick', hp: Math.round(260 * s), yieldPer: 8, parts: [part],

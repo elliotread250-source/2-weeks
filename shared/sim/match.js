@@ -126,10 +126,10 @@ export class Match {
     const a = r.random() * Math.PI * 2;
     const dir = new Vec3(Math.cos(a), 0, Math.sin(a));
     const perp = new Vec3(-dir.z, 0, dir.x).multiplyScalar(r.range(-50, 50));
-    const start = dir.clone().multiplyScalar(-300).add(perp);
-    const end = dir.clone().multiplyScalar(300).add(perp);
+    const start = dir.clone().multiplyScalar(-470).add(perp);
+    const end = dir.clone().multiplyScalar(470).add(perp);
     start.y = end.y = 115;
-    this.bus = { start, end, dir, pos: start.clone(), t: 0, duration: 30, timeLeft: 30 };
+    this.bus = { start, end, dir, pos: start.clone(), t: 0, duration: 38, timeLeft: 38 };
   }
 
   jumpFromBus(f) {
