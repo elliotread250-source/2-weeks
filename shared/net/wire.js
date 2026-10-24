@@ -19,11 +19,11 @@ export function pickupToWire(pk) {
   };
 }
 
-const POSITIONAL = new Set(['muzzle', 'tracer', 'burst', 'harvestHit', 'buildDamaged', 'explosion', 'eliminated']);
+const POSITIONAL = new Set(['muzzle', 'tracer', 'burst', 'harvestHit', 'buildDamaged', 'explosion', 'eliminated', 'projSpawn', 'projEnd']);
 const EVERYONE = new Set([
   'staticBroken', 'staticDamaged', 'harvestBroken', 'buildPlaced', 'buildChanged', 'buildDestroyed',
   'buildComplete', 'buildCollapsing', 'pickupSpawned', 'pickupRemoved', 'chestOpened', 'chestMoved',
-  'feed', 'matchStart', 'matchOver',
+  'feed', 'matchStart', 'matchOver', 'supplyDrop', 'supplyLanded',
 ]);
 const TARGETED_BY = new Set(['kick', 'matGain', 'damageNumber']);
 
@@ -47,6 +47,7 @@ export function serializeEvent(ev, match) {
     case 'pickupRemoved': out.id = ev.pk.id; break;
     case 'chestOpened': out.id = ev.c.id; break;
     case 'chestMoved': out.id = ev.c.id; out.y = ev.c.pos.y; break;
+    case 'supplyDrop': out.c = { id: ev.c.id, x: ev.c.pos.x, y: ev.c.pos.y, z: ev.c.pos.z, rot: ev.c.rot, landY: ev.c.landY }; break;
     case 'matchStart': {
       const b = match.bus;
       out.bus = { start: { x: b.start.x, y: b.start.y, z: b.start.z }, end: { x: b.end.x, y: b.end.y, z: b.end.z }, dir: { x: b.dir.x, y: b.dir.y, z: b.dir.z }, duration: b.duration };
@@ -85,6 +86,7 @@ export function buildWelcome(match, selfId) {
     pickups: match.loot.pickups.map(pickupToWire),
     chestsOpen: match.loot.chests.filter((c) => c.opened).map((c) => c.id),
     chestY: match.loot.chests.filter((c) => c.moved).map((c) => [c.id, c.pos.y]),
+    supply: match.loot.chests.filter((c) => c.type === 'supply').map((c) => ({ id: c.id, x: c.pos.x, y: c.pos.y, z: c.pos.z, rot: c.rot, landY: c.landY, opened: c.opened, falling: c.falling })),
     deadStatics: match.world.elements.filter((e) => e.dead).map((e) => e.id),
     hpStatics: match.world.elements.filter((e) => !e.dead && e.hp < e.maxHp).map((e) => [e.id, e.hp]),
     harvest: match.world.harvestables.filter((h) => h.dead || h.hp < h.maxHp).map((h) => [h.id, h.hp, h.dead ? 1 : 0]),
@@ -165,6 +167,12 @@ export function setBus(match, b) {
 }
 
 // Apply one server event to the replica and queue the matching local event.
+function addRemoteSupply(match, d) {
+  const c = { id: d.id, type: 'supply', pos: new Vec3(d.x, d.y, d.z), rot: d.rot, opened: !!d.opened, falling: d.falling !== false && d.y > d.landY + 0.01, landY: d.landY, sync: 0 };
+  match.loot.chests.push(c);
+  return c;
+}
+
 export function applyWireEvent(match, w) {
   const world = match.world;
   const byId = (id) => match.fighters.find((f) => f.id === id);
@@ -209,6 +217,7 @@ export function applyWireEvent(match, w) {
     }
     case 'chestOpened': { const c = match.loot.chests.find((q) => q.id === w.id); if (c && !c.opened) { c.opened = true; match.pushEvent('chestOpened', { c }); } break; }
     case 'chestMoved': { const c = match.loot.chests.find((q) => q.id === w.id); if (c) { c.pos.y = w.y; match.pushEvent('chestMoved', { c }); } break; }
+    case 'supplyDrop': { const c = addRemoteSupply(match, w.c); match.pushEvent('supplyDrop', { c }); break; }
     case 'matchStart': setBus(match, w.bus); match.pushEvent('matchStart', {}); break;
     case 'spectate': match.pushEvent('spectate', { id: w.id, killer: w.killer }); break;
     default: {

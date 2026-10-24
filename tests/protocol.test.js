@@ -26,7 +26,7 @@ test('hostile command fields are clamped', () => {
   assert.equal(c.yaw, 0);
   assert.equal(c.pitch, 1.5);
   assert.equal(c.held, 0xff);
-  assert.equal(c.act, 0x7ff);
+  assert.equal(c.act, 0xfff);
   assert.equal(c.slot, 5);
   assert.equal(c.piece, -1);
 });

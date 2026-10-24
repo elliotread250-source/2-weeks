@@ -14,6 +14,12 @@ export class CameraRig {
     this.dir = new THREE.Vector3();
     this.camera.rotation.order = 'YXZ';
     this.shakeAmp = 0;
+    this.rcp = 0; this.rcy = 0; // visual recoil, decays; never feeds back into aim
+  }
+
+  recoil(pitch, yaw) {
+    this.rcp = Math.min(0.12, this.rcp + pitch);
+    this.rcy += yaw;
   }
 
   // Kick the camera. amount ~0.3 for a hit, ~1 for a close explosion.
@@ -76,7 +82,8 @@ export class CameraRig {
       cam.position.z += (Math.random() - 0.5) * 0.12 * amp;
     }
     this.shakeAmp *= 0.88;
-    cam.rotation.set(pitch, yaw, 0);
+    cam.rotation.set(pitch + this.rcp, yaw + this.rcy, 0);
+    this.rcp *= 0.86; this.rcy *= 0.86;
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov += (fov - cam.fov) * 0.35;
       cam.updateProjectionMatrix();

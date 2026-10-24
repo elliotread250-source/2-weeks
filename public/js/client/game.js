@@ -2,7 +2,7 @@
 // sim commands through a host, and turns sim events into visuals, sound and HUD.
 // It never changes gameplay state itself; the sim (shared/sim) does that.
 import * as THREE from 'three';
-import { RARITIES, PICKAXE, INTERACT, WEAPONS } from '/shared/config.js';
+import { RARITIES, PICKAXE, INTERACT, WEAPONS, GRENADE } from '/shared/config.js';
 import { GAME } from '/shared/names.js';
 import { itemName } from '/shared/sim/loot.js';
 import { interactTarget, emptyCommand } from '/shared/sim/controller.js';
@@ -23,6 +23,7 @@ import { CameraRig } from './camera.js';
 import { ContrailSystem } from '../render/cosmetics.js';
 import { item as cosmetic } from '/shared/cosmetics/catalog.js';
 import { showWheel } from '../ui/wheel.js';
+import { renderInventory } from '../ui/inventory.js';
 
 function makeSky() {
   const geo = new THREE.SphereGeometry(1500, 24, 12);
@@ -136,7 +137,7 @@ export class Game {
     this.buildView = new BuildView(scene, { destroyed: (p, mode, mat) => this.onBuildDestroyed(p, mode, mat) });
     this.lootView = new LootView(scene);
     this.stormView = new StormView(scene);
-    this.rocketMeshes = new Map();
+    this.projectiles = new Map(); // id -> {kind, pos, vel, mesh}, fed by projSpawn/projEnd events
     this.busMesh = null;
 
     this.views = new Map();
@@ -228,7 +229,8 @@ export class Game {
     this.cameraRig.update(p, lp, this.input.yaw, this.input.pitch, { match: m, spectate: this.spectate });
 
     this.updateBusMesh();
-    this.updateRockets();
+    this.updateProjectiles(dt);
+    renderInventory(p, this.input.held('inventory'));
     this.updatePlayerOverlays();
     for (const f of m.fighters) {
       if (f.alive && !f.hidden && f.airborne && f.loadout && f.loadout.contrail) {
@@ -267,24 +269,24 @@ export class Game {
     }
   }
 
-  updateRockets() {
-    const live = new Set();
-    for (const r of this.match.combat.rockets) {
-      live.add(r.id);
-      let mesh = this.rocketMeshes.get(r.id);
-      if (!mesh) {
-        mesh = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.09, 0.09, 0.6, 6).rotateX(Math.PI / 2),
-          new THREE.MeshLambertMaterial({ color: '#556b2f', emissive: '#331100' }),
-        );
-        mesh.lookAt(r.dir.x, r.dir.y, r.dir.z);
-        this.scene.add(mesh);
-        this.rocketMeshes.set(r.id, mesh);
+  // Rockets fly straight; grenades arc under gravity until the server says they blew up.
+  updateProjectiles(dt) {
+    for (const p of this.projectiles.values()) {
+      if (p.kind === 'grenade') {
+        p.vel.y -= GRENADE.gravity * dt;
+        const next = p.pos.clone().addScaledVector(p.vel, dt);
+        const gy = this.match.collision.groundHeight(next.x, next.z, p.pos.y + 0.5, 0.05) + 0.12;
+        if (next.y < gy) { next.y = gy; p.vel.set(p.vel.x * 0.5, 0, p.vel.z * 0.5); }
+        p.pos.copy(next);
+      } else p.pos.addScaledVector(p.vel, dt);
+      if (!p.mesh) {
+        p.mesh = p.kind === 'grenade'
+          ? new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshLambertMaterial({ color: '#4d6b2f', emissive: '#112200' }))
+          : new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.6, 6).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#556b2f', emissive: '#331100' }));
+        if (p.kind !== 'grenade') p.mesh.lookAt(p.vel.x, p.vel.y, p.vel.z);
+        this.scene.add(p.mesh);
       }
-      mesh.position.set(r.pos.x, r.pos.y, r.pos.z);
-    }
-    for (const [id, mesh] of this.rocketMeshes) {
-      if (!live.has(id)) { this.scene.remove(mesh); this.rocketMeshes.delete(id); }
+      p.mesh.position.copy(p.pos);
     }
   }
 
@@ -402,7 +404,11 @@ export class Game {
           sfx('explosion', this.distanceVolume(ev.pos, 200, 0.1));
           this.cameraRig.shake(this.distanceVolume(ev.pos, 60, 0) * 1.2);
           break;
-        case 'kick': if (ev.by === me) hud.kick(ev.k); break;
+        case 'kick': if (ev.by === me) { hud.kick(ev.k); this.cameraRig.recoil(ev.pitch || 0, ev.yaw || 0); } break;
+        case 'projSpawn': this.projectiles.set(ev.id, { kind: ev.kind, pos: new THREE.Vector3(ev.pos.x, ev.pos.y, ev.pos.z), vel: new THREE.Vector3(ev.vel.x, ev.vel.y, ev.vel.z), mesh: null }); break;
+        case 'projEnd': { const p = this.projectiles.get(ev.id); if (p) { if (p.mesh) this.scene.remove(p.mesh); this.projectiles.delete(ev.id); } break; }
+        case 'supplyDrop': this.lootView.handle(ev); break;
+        case 'supplyLanded': sfx('chest', this.distanceVolume(ev.pos, 150, 0.15)); break;
         case 'matGain': if (ev.by === me) hud.matGain(ev.mat, ev.n); break;
         case 'damageNumber': if (ev.by === me) this.fx.damageNumber(ev.pos, ev.amount, ev.kind); break;
         case 'hit':

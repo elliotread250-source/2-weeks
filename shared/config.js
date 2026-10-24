@@ -60,38 +60,65 @@ export const WEAPONS = {
     name: WEAPON_NAMES.ar, short: WEAPON_SHORT.ar, ammo: 'medium', auto: true,
     damage: [30, 31, 33, 35, 36], fireRate: 5.5, mag: 30,
     reload: [2.7, 2.6, 2.5, 2.4, 2.3], spread: 0.022, adsSpread: 0.008, bloom: 0.006,
-    headMult: 1.5, range: 160, structureMult: 1, pellets: 1, zoom: 1.6,
+    headMult: 1.5, range: 160, structureMult: 1, pellets: 1, zoom: 1.6, recoil: { pitch: 0.011, yaw: 0.004 },
   },
   pump: {
     name: WEAPON_NAMES.pump, short: WEAPON_SHORT.pump, ammo: 'shells', auto: false,
     damage: [80, 85, 90, 95, 100], fireRate: 0.75, mag: 5,
     reload: [5.0, 4.8, 4.6, 4.4, 4.2], spread: 0.085, adsSpread: 0.07, bloom: 0,
-    headMult: 2.0, range: 45, structureMult: 1, pellets: 10, zoom: 1.2,
+    headMult: 2.0, range: 45, structureMult: 1, pellets: 10, zoom: 1.2, recoil: { pitch: 0.06, yaw: 0.01 },
   },
   smg: {
     name: WEAPON_NAMES.smg, short: WEAPON_SHORT.smg, ammo: 'light', auto: true,
     damage: [16, 17, 18, 19, 20], fireRate: 11, mag: 30,
     reload: [2.3, 2.2, 2.1, 2.0, 1.9], spread: 0.035, adsSpread: 0.022, bloom: 0.004,
-    headMult: 1.75, range: 90, structureMult: 1, pellets: 1, zoom: 1.3,
+    headMult: 1.75, range: 90, structureMult: 1, pellets: 1, zoom: 1.3, recoil: { pitch: 0.007, yaw: 0.005 },
   },
   pistol: {
     name: WEAPON_NAMES.pistol, short: WEAPON_SHORT.pistol, ammo: 'light', auto: false,
     damage: [24, 25, 26, 27, 28], fireRate: 6.75, mag: 16,
     reload: [1.5, 1.45, 1.4, 1.35, 1.3], spread: 0.02, adsSpread: 0.01, bloom: 0.01,
-    headMult: 2.0, range: 90, structureMult: 1, pellets: 1, zoom: 1.3,
+    headMult: 2.0, range: 90, structureMult: 1, pellets: 1, zoom: 1.3, recoil: { pitch: 0.02, yaw: 0.004 },
   },
   sniper: {
     name: WEAPON_NAMES.sniper, short: WEAPON_SHORT.sniper, ammo: 'heavy', auto: false,
     damage: [null, null, 105, 110, 116], fireRate: 0.33, mag: 1,
     reload: [3.2, 3.2, 3.0, 2.9, 2.8], spread: 0.12, adsSpread: 0.0, bloom: 0,
-    headMult: 2.5, range: 450, structureMult: 0.6, pellets: 1, zoom: 5, scope: true,
+    headMult: 2.5, range: 450, structureMult: 0.6, pellets: 1, zoom: 5, scope: true, recoil: { pitch: 0.07, yaw: 0.005 },
   },
   rocket: {
     name: WEAPON_NAMES.rocket, short: WEAPON_SHORT.rocket, ammo: 'rockets', auto: false,
     damage: [null, null, null, 110, 121], fireRate: 0.75, mag: 1,
     reload: [3.6, 3.6, 3.6, 3.4, 3.2], spread: 0.01, adsSpread: 0.005, bloom: 0,
     headMult: 1, range: 300, structureMult: 4, pellets: 1, zoom: 1.4,
-    projectile: { speed: 65, splash: 4.5, structureDamage: 400 },
+    projectile: { speed: 65, splash: 4.5, structureDamage: 400 }, recoil: { pitch: 0.05, yaw: 0 },
+  },
+  // Semi-auto shotgun: faster than the pump, weaker per shell.
+  tac: {
+    name: WEAPON_NAMES.tac, short: WEAPON_SHORT.tac, ammo: 'shells', auto: false,
+    damage: [66, 70, 73, 77, 80], fireRate: 2.0, mag: 8,
+    reload: [6.2, 5.9, 5.6, 5.3, 5.0], spread: 0.09, adsSpread: 0.075, bloom: 0,
+    headMult: 1.75, range: 40, structureMult: 1, pellets: 10, zoom: 1.2, recoil: { pitch: 0.035, yaw: 0.008 },
+  },
+  // Three-round burst. fireRate counts bursts per second.
+  burst: {
+    name: WEAPON_NAMES.burst, short: WEAPON_SHORT.burst, ammo: 'medium', auto: false, burst: { shots: 3, gap: 0.085 },
+    damage: [28, 29, 31, 32, 34], fireRate: 2.3, mag: 30,
+    reload: [2.9, 2.8, 2.7, 2.6, 2.5], spread: 0.018, adsSpread: 0.006, bloom: 0.004,
+    headMult: 1.5, range: 180, structureMult: 1, pellets: 1, zoom: 1.8, recoil: { pitch: 0.012, yaw: 0.003 },
+  },
+  // Slow, precise, no scope overlay: rewards aim over volume.
+  dmr: {
+    name: WEAPON_NAMES.dmr, short: WEAPON_SHORT.dmr, ammo: 'medium', auto: false,
+    damage: [null, 40, 42, 44, 46], fireRate: 2.6, mag: 20,
+    reload: [null, 3.0, 2.9, 2.8, 2.7], spread: 0.03, adsSpread: 0.002, bloom: 0.012,
+    headMult: 2.2, range: 300, structureMult: 0.8, pellets: 1, zoom: 3, recoil: { pitch: 0.03, yaw: 0.004 },
+  },
+  revolver: {
+    name: WEAPON_NAMES.revolver, short: WEAPON_SHORT.revolver, ammo: 'medium', auto: false,
+    damage: [54, 57, 60, 63, 66], fireRate: 1.6, mag: 6,
+    reload: [3.6, 3.5, 3.4, 3.3, 3.2], spread: 0.018, adsSpread: 0.004, bloom: 0.02,
+    headMult: 2.4, range: 120, structureMult: 1, pellets: 1, zoom: 1.5, recoil: { pitch: 0.045, yaw: 0.006 },
   },
 };
 
@@ -106,6 +133,7 @@ export const CONSUMABLES = {
   medkit: { name: CONSUMABLE_NAMES.medkit, short: CONSUMABLE_SHORT.medkit, rarity: 1, stack: 3, time: 10, health: 100, healthCap: 100, pickup: 1 },
   minis: { name: CONSUMABLE_NAMES.minis, short: CONSUMABLE_SHORT.minis, rarity: 1, stack: 6, time: 2, shield: 25, shieldCap: 50, pickup: 3 },
   bigpot: { name: CONSUMABLE_NAMES.bigpot, short: CONSUMABLE_SHORT.bigpot, rarity: 2, stack: 3, time: 5, shield: 50, shieldCap: 100, pickup: 1 },
+  grenade: { name: CONSUMABLE_NAMES.grenade, short: CONSUMABLE_SHORT.grenade, rarity: 1, stack: 6, time: 0, pickup: 3, throw: true },
   chug: { name: CONSUMABLE_NAMES.chug, short: CONSUMABLE_SHORT.chug, rarity: 4, stack: 1, time: 15, health: 100, healthCap: 100, shield: 100, shieldCap: 100, pickup: 1 },
 };
 
@@ -157,7 +185,15 @@ export const FALLOFF = {
   pump: { start: 7, span: 25, min: 0.25 },
   smg: { start: 25, span: 80, min: 0.6 },
   pistol: { start: 25, span: 80, min: 0.6 },
+  tac: { start: 8, span: 20, min: 0.2 },
+  revolver: { start: 35, span: 90, min: 0.65 },
 };
+
+// Thrown Frag Grenade: arcs under gravity, bounces off the world, blows after the fuse.
+export const GRENADE = { speed: 17, up: 0.18, gravity: 22, fuse: 2.2, splash: 5.5, damage: 100, structureDamage: 250, bounce: 0.45 };
+
+// Supply drops fall into the next safe circle when a storm phase begins.
+export const SUPPLY = { fallSpeed: 9, height: 140, fromPhase: 1, everyPhases: 1 };
 
 export const EMOTE_COUNT = 25;
 export const EMOTE_COOLDOWN = 0.5;

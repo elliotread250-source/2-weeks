@@ -60,8 +60,11 @@ const GUN = {
 };
 
 // vol scales with distance for other players' sounds.
+const GUN_ALIAS = { tac: 'pump', burst: 'ar', dmr: 'sniper', revolver: 'pistol' };
+
 export function sfx(name, vol = 1) {
   if (!ctx || vol < 0.02) return;
+  name = GUN_ALIAS[name] || name;
   const t = ctx.currentTime;
   switch (name) {
     case 'ar': case 'smg': case 'pistol': case 'pump': case 'sniper': case 'rocket': {

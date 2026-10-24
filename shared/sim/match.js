@@ -6,6 +6,7 @@
 // build/loot/world changes) comes out as events in `this.events`; a host drains
 // it every tick with `takeEvents()`.
 import {
+  SUPPLY,
   PLAYER, BOT_COUNT, RESURGENCE_END_PHASE, RESURGENCE_DELAY, TICK_DT,
 } from '../config.js';
 import { GAME, BOT_NAMES } from '../names.js';
@@ -363,6 +364,12 @@ export class Match {
           this.checkWin();
         } else {
           this.emit('message', { to: null, text: 'STORM EYE FORMING', sub: 'Check your map', dur: 3, key: 'stormForming' });
+          if (this.storm.phase >= SUPPLY.fromPhase && (this.storm.phase - SUPPLY.fromPhase) % SUPPLY.everyPhases === 0) {
+            const n = this.storm.next;
+            const a = this.rng.random() * Math.PI * 2, d = Math.sqrt(this.rng.random()) * n.r * 0.6;
+            this.loot.addSupplyDrop(n.c.x + Math.cos(a) * d, n.c.y + Math.sin(a) * d);
+            this.emit('message', { to: null, text: 'SUPPLY DROP INBOUND', sub: 'Look for the balloon crate', dur: 3 });
+          }
         }
       }
       this.stormTick -= dt;

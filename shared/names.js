@@ -18,10 +18,15 @@ export const WEAPON_NAMES = {
   pistol: 'Pistol',
   sniper: 'Bolt-Action Sniper',
   rocket: 'Rocket Launcher',
+  tac: 'Tactical Shotgun',
+  burst: 'Burst Rifle',
+  dmr: 'Marksman Rifle',
+  revolver: 'Revolver',
 };
 
 export const WEAPON_SHORT = {
   ar: 'AR', pump: 'PUMP', smg: 'SMG', pistol: 'PISTOL', sniper: 'SNIPER', rocket: 'ROCKET',
+  tac: 'TAC', burst: 'BURST', dmr: 'DMR', revolver: 'REVOLVER',
 };
 
 export const CONSUMABLE_NAMES = {
@@ -30,10 +35,11 @@ export const CONSUMABLE_NAMES = {
   minis: 'Small Shield Potion',
   bigpot: 'Shield Potion',
   chug: 'Big Jug',
+  grenade: 'Frag Grenade',
 };
 
 export const CONSUMABLE_SHORT = {
-  bandage: 'BAND', medkit: 'MED', minis: 'MINI', bigpot: 'BIG POT', chug: 'JUG',
+  bandage: 'BAND', medkit: 'MED', minis: 'MINI', bigpot: 'BIG POT', chug: 'JUG', grenade: 'NADE',
 };
 
 export const AMMO_NAMES = {

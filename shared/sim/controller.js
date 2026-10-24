@@ -1,7 +1,7 @@
 // Turns one input command into fighter state for one tick. This is the only
 // path from a human's keyboard to the simulation, so the same code runs in the
 // browser (offline and, later, for prediction) and on the server.
-import { PLAYER, WEAPONS, BUILD_COST, MAT_ORDER, INTERACT, EMOTE_COUNT } from '../config.js';
+import { PLAYER, WEAPONS, CONSUMABLES, BUILD_COST, MAT_ORDER, INTERACT, EMOTE_COUNT } from '../config.js';
 import { Vec3 } from '../math/vec3.js';
 import { itemRarity } from './loot.js';
 
@@ -11,7 +11,7 @@ export const HELD = {
 };
 // Edge events since the previous command (pressed this tick, never lost).
 export const ACT = {
-  JUMP: 1, FIRE: 2, FIRE_UP: 4, INTERACT: 8, RELOAD: 16, BUILD: 32, EDIT: 64, EDIT_RESET: 128, AIM: 256, MAT: 512, SHOULDER: 1024,
+  JUMP: 1, FIRE: 2, FIRE_UP: 4, INTERACT: 8, RELOAD: 16, BUILD: 32, EDIT: 64, EDIT_RESET: 128, AIM: 256, MAT: 512, SHOULDER: 1024, DROP: 2048,
 };
 export const PIECES = ['wall', 'floor', 'ramp', 'cone'];
 
@@ -159,6 +159,14 @@ export function resetModes(match, f) {
 }
 
 function updateCombat(match, f, cmd, act, held) {
+  // Drop the selected item at your feet (G is taken, so the bind lives in binds.js).
+  if (act(ACT.DROP) && f.selected > 0 && f.slots[f.selected - 1] && !f.heal) {
+    const dropped = f.slots[f.selected - 1];
+    f.slots[f.selected - 1] = null;
+    match.loot.drop(dropped, f.pos.clone().add(new Vec3(0, 1, 0)), true);
+    f.select(0);
+    return;
+  }
   const { origin, dir } = f.aimRay();
   if (f.selected === 0) {
     if (held(HELD.FIRE)) match.combat.swing(f, origin, dir);
@@ -171,6 +179,8 @@ function updateCombat(match, f, cmd, act, held) {
     if ((spec.auto && held(HELD.FIRE)) || act(ACT.FIRE)) {
       match.combat.fire(f, origin, dir, { ads: f.ads, firstShotAccurate: true, rewindTick: cmd.viewTick });
     }
+  } else if (it.kind === 'consumable' && CONSUMABLES[it.type].throw) {
+    if (act(ACT.FIRE)) match.combat.throwGrenade(f, origin, dir);
   } else if (it.kind === 'consumable' && act(ACT.FIRE)) {
     if (!match.combat.startHeal(f)) match.emit('message', { to: f.id, text: '', sub: "You can't use that right now", dur: 1.2 });
   }

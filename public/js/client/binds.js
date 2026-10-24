@@ -22,6 +22,8 @@ export const ACTIONS = [
   { id: 'slot3', label: 'Slot 3', group: 'Inventory', def: 'Digit4' },
   { id: 'slot4', label: 'Slot 4', group: 'Inventory', def: 'Digit5' },
   { id: 'slot5', label: 'Slot 5', group: 'Inventory', def: 'Digit6' },
+  { id: 'drop', label: 'Drop selected item', group: 'Inventory', def: 'KeyH' },
+  { id: 'inventory', label: 'Inventory (hold)', group: 'Inventory', def: 'Tab' },
   { id: 'build', label: 'Toggle build mode', group: 'Building', def: 'KeyQ' },
   { id: 'wall', label: 'Wall', group: 'Building', def: 'KeyZ' },
   { id: 'floor', label: 'Floor', group: 'Building', def: 'KeyX' },

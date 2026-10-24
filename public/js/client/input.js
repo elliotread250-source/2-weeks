@@ -57,6 +57,7 @@ export class InputController {
         case 'matCycle': this.act |= ACT.MAT; break;
         case 'swapShoulder': this.act |= ACT.SHOULDER; this.shoulder = -this.shoulder; break;
         case 'emote': this.openWheel(); break;
+        case 'drop': this.act |= ACT.DROP; break;
         case 'map': this.mapOpen = !this.mapOpen; break;
         default:
           if (SLOT_ACTIONS.includes(a)) this.slot = SLOT_ACTIONS.indexOf(a);

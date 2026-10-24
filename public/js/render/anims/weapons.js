@@ -107,6 +107,6 @@ export function weaponClips() {
 }
 
 export const WEAPON_CLASSES = Object.keys(GRIPS);
-export const classOfWeapon = { ar: 'rifle', pump: 'shotgun', smg: 'smg', pistol: 'pistol', sniper: 'sniper', rocket: 'launcher' };
+export const classOfWeapon = { ar: 'rifle', pump: 'shotgun', smg: 'smg', pistol: 'pistol', sniper: 'sniper', rocket: 'launcher', tac: 'shotgun', burst: 'rifle', dmr: 'rifle', revolver: 'pistol' };
 
 void seg; void cs;
