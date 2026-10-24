@@ -2,6 +2,7 @@
 // waits for a sim tick); everything else is folded into one command per tick,
 // including presses that happen between ticks.
 import { binds, settings } from './binds.js';
+import { readPad, activePad, lookRate } from './gamepad.js';
 import { HELD, ACT, PIECES, emptyCommand } from '/shared/sim/controller.js';
 
 const SLOT_ACTIONS = ['pickaxe', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5'];
@@ -19,6 +20,8 @@ export class InputController {
     this.seq = 0;
     this.shoulder = 1;
     this.wheel = null;
+    this.padHeld = new Set(); // actions currently held on the controller
+    this.padMove = { x: 0, y: 0 };
     this.emoteReq = 0;
     this.resetEdges();
     this.bind();
@@ -33,7 +36,7 @@ export class InputController {
     this.emoteReq = 0;
   }
 
-  held(action) { return this.keys.has(binds[action]); }
+  held(action) { return this.keys.has(binds[action]) || this.padHeld.has(action); }
 
   // Every action bound to this input code, so a shared button (aim + reset
   // edit on right mouse) triggers both.
@@ -44,7 +47,12 @@ export class InputController {
   down(code) {
     if (this.keys.has(code)) return;
     this.keys.add(code);
-    for (const a of this.actionsFor(code)) {
+    for (const a of this.actionsFor(code)) this.trigger(a);
+  }
+
+  // One action starting (a key went down or a controller button was pressed).
+  trigger(a) {
+    {
       switch (a) {
         case 'jump': this.act |= ACT.JUMP; break;
         case 'fire': this.act |= ACT.FIRE; break;
@@ -58,6 +66,7 @@ export class InputController {
         case 'swapShoulder': this.act |= ACT.SHOULDER; this.shoulder = -this.shoulder; break;
         case 'emote': this.openWheel(); break;
         case 'drop': this.act |= ACT.DROP; break;
+        case 'perf': this.perfShown = !this.perfShown; break;
         case 'map': this.mapOpen = !this.mapOpen; break;
         default:
           if (SLOT_ACTIONS.includes(a)) this.slot = SLOT_ACTIONS.indexOf(a);
@@ -68,8 +77,37 @@ export class InputController {
 
   up(code) {
     if (!this.keys.delete(code)) return;
-    if (this.actionsFor(code).includes('fire')) this.act |= ACT.FIRE_UP;
-    if (this.actionsFor(code).includes('emote')) this.closeWheel();
+    for (const a of this.actionsFor(code)) this.release(a);
+  }
+
+  release(a) {
+    if (a === 'fire') this.act |= ACT.FIRE_UP;
+    if (a === 'emote') this.closeWheel();
+  }
+
+  // Controller: edges become the same actions keys produce; sticks feed look and move.
+  pollPad(dt) {
+    const snap = readPad(activePad());
+    for (const a of snap.held) {
+      if (this.padHeld.has(a)) continue;
+      if (a === 'slotNext' || a === 'slotPrev') {
+        const step = a === 'slotNext' ? 1 : -1;
+        const f = this.hooks.localFighter();
+        if (f && f.buildMode) this.matStep = step; else this.slotStep = step;
+      } else {
+        this.trigger(a);
+        if (a === 'interact') this.trigger('reload'); // X does both; reload ignores a full mag
+      }
+    }
+    for (const a of this.padHeld) if (!snap.held.has(a)) this.release(a);
+    this.padHeld = snap.held;
+    this.padMove = snap.move;
+    if (snap.look.x || snap.look.y) {
+      const f = this.hooks.localFighter();
+      const k = (f && f.scoped ? 0.3 : f && f.ads ? 0.65 : 1) * (settings.sensitivity || 1);
+      this.yaw -= lookRate(snap.look.x, k) * dt;
+      this.pitch = Math.max(-1.45, Math.min(1.35, this.pitch - lookRate(snap.look.y, k) * dt));
+    }
   }
 
   // Hold the emote key: the mouse picks one of six slots. A quick tap with no
@@ -148,8 +186,9 @@ export class InputController {
   }
 
   // Apply mouse movement to the look angles. Runs every rendered frame.
-  updateLook(f) {
+  updateLook(f, dt = 1 / 60) {
     if (f) f.shoulder = this.shoulder;
+    this.pollPad(dt);
     let sens = 0.0022 * (settings.sensitivity || 1);
     if (f && f.scoped) sens *= 0.25;
     else if (f && f.ads) sens *= 0.6;
@@ -165,8 +204,9 @@ export class InputController {
     cmd.seq = ++this.seq;
     cmd.yaw = this.yaw;
     cmd.pitch = this.pitch;
-    cmd.mz = (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0);
-    cmd.mx = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
+    cmd.mz = (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0) - this.padMove.y;
+    cmd.mx = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0) + this.padMove.x;
+    cmd.mz = Math.max(-1, Math.min(1, cmd.mz)); cmd.mx = Math.max(-1, Math.min(1, cmd.mx));
     let held = 0;
     if (this.held('fire')) held |= HELD.FIRE;
     if (this.held('aim')) held |= HELD.AIM;
@@ -174,7 +214,7 @@ export class InputController {
     if (this.held('sprint')) held |= HELD.SPRINT;
     if (this.held('crouch')) held |= HELD.CROUCH;
     if (this.held('interact')) held |= HELD.INTERACT;
-    if (this.held('forward')) held |= HELD.FORWARD;
+    if (this.held('forward') || this.padMove.y < -0.3) held |= HELD.FORWARD;
     if (settings.confirmEditOnRelease) held |= HELD.CONFIRM_RELEASE;
     cmd.held = held;
     cmd.act = this.act;
@@ -182,7 +222,7 @@ export class InputController {
     cmd.slotStep = this.slotStep;
     cmd.piece = this.piece;
     cmd.matStep = this.matStep;
-    cmd.emote = this.emoteReq || (this.held('forward') || this.held('back') || this.held('left') || this.held('right') ? -1 : 0);
+    cmd.emote = this.emoteReq || (this.held('forward') || this.held('back') || this.held('left') || this.held('right') || this.padMove.x || this.padMove.y ? -1 : 0);
     this.resetEdges();
     return cmd;
   }

@@ -15,7 +15,7 @@ import { FighterView } from '../render/character.js';
 import { FX } from '../render/fx.js';
 import { HUD } from '../ui/hud.js';
 import { iconSVG } from '../ui/icons.js';
-import { sfx } from '../audio/audio.js';
+import { sfx, setListener, startMusic } from '../audio/audio.js';
 import { label } from './binds.js';
 import { LocalHost } from './host.js';
 import { InputController } from './input.js';
@@ -24,6 +24,11 @@ import { ContrailSystem } from '../render/cosmetics.js';
 import { item as cosmetic } from '/shared/cosmetics/catalog.js';
 import { showWheel } from '../ui/wheel.js';
 import { renderInventory } from '../ui/inventory.js';
+import { currentQuality, Perf } from './quality.js';
+import { setLodDistances } from '../render/character.js';
+import { createPost } from '../render/post.js';
+import { settings } from './binds.js';
+import { poiAt } from '/shared/sim/terrain.js';
 
 function makeSky() {
   const geo = new THREE.SphereGeometry(1500, 24, 12);
@@ -34,11 +39,19 @@ function makeSky() {
       top: { value: new THREE.Color('#2a8cf0') },
       mid: { value: new THREE.Color('#8fd3ff') },
       bottom: { value: new THREE.Color('#d9f2ff') },
+      sunDir: { value: new THREE.Vector3(80, 140, 50).normalize() },
     },
     vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; varying vec3 vP;
-      void main(){ float h = normalize(vP).y; vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.6)) : mix(mid, bottom, min(1.0, -h * 4.0));
-      gl_FragColor = vec4(c, 1.0); }`,
+    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 sunDir; varying vec3 vP;
+      void main(){
+        vec3 d = normalize(vP);
+        float h = d.y;
+        vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.6)) : mix(mid, bottom, min(1.0, -h * 4.0));
+        // Warm haze toward the sun and a soft bright core, so the light has a direction.
+        float s = max(0.0, dot(d, sunDir));
+        c += vec3(1.0, 0.86, 0.6) * pow(s, 24.0) * 0.28 + vec3(1.0, 0.95, 0.8) * pow(s, 400.0) * 0.9;
+        gl_FragColor = vec4(c, 1.0);
+      }`,
   });
   const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false;
@@ -91,30 +104,44 @@ export class Game {
     this.focusHarvest = null;
     this.spectate = null;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    const q = opts.quality || currentQuality();
+    this.quality = q;
+    const renderer = new THREE.WebGLRenderer({ antialias: q.id !== 'low', powerPreference: 'high-performance' });
+    this.basePixelRatio = Math.min(window.devicePixelRatio, q.pixel);
+    renderer.setPixelRatio(this.basePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = opts.shadows !== false;
+    renderer.shadowMap.enabled = q.shadows;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     this.renderer = renderer;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog('#bfe6ff', 180, 700);
+    scene.fog = new THREE.Fog('#bfe6ff', q.fog[0], q.fog[1]);
+    setLodDistances(q.lod[0], q.lod[1]);
     scene.add(makeSky());
     this.scene = scene;
 
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, q.far);
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      if (this.post) this.post.resize(window.innerWidth, window.innerHeight);
     });
+    // Dynamic resolution: the perf monitor lowers the render scale when frames run long.
+    this.perf = new Perf(q, (s) => {
+      renderer.setPixelRatio(this.basePixelRatio * s);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (this.post) { this.post.setPixelRatio(this.basePixelRatio * s); this.post.resize(window.innerWidth, window.innerHeight); }
+    });
+    this.post = null;
+    if (q.post) createPost(renderer, scene, this.camera).then((p) => { this.post = p; });
 
     scene.add(new THREE.HemisphereLight('#d6efff', '#5f8f3e', 1.25));
     const sun = new THREE.DirectionalLight('#fff1d6', 2.1);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.castShadow = q.shadows;
+    sun.shadow.mapSize.set(q.shadowSize || 1024, q.shadowSize || 1024);
     const sc = sun.shadow.camera;
     sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 1; sc.far = 400;
     sun.shadow.bias = -0.0006;
@@ -128,10 +155,12 @@ export class Game {
     this.player = this.host.local;
 
     this.fx = new FX(scene, this.camera, document.getElementById('numbers'));
+    this.fx.maxDebris = q.particles;
     this.fx.groundFn = (x, z, y) => this.match.collision.groundHeight(x, z, y, 0.05);
     this.hud = new HUD();
     this.worldView = new WorldView(scene, this.match.world, {
-      detail: opts.detail,
+      detail: q.grass,
+      terrainStride: q.terrainStride,
       fxHooks: { shatter: (el, mode) => this.onStaticShatter(el, mode) },
     });
     this.buildView = new BuildView(scene, { destroyed: (p, mode, mat) => this.onBuildDestroyed(p, mode, mat) });
@@ -179,6 +208,7 @@ export class Game {
     this.input.yaw = Math.atan2(-d.x, -d.z) + Math.PI * 0.35;
     this.input.pitch = -0.35;
     this.hud.show(true);
+    startMusic('match');
     this.input.lock();
     this.clock.start();
     requestAnimationFrame(this.loop);
@@ -192,10 +222,28 @@ export class Game {
 
   loop() {
     requestAnimationFrame(this.loop);
-    const dt = Math.min(0.05, this.clock.getDelta());
+    const raw = this.clock.getDelta();
+    const dt = Math.min(0.05, raw);
     if (!this.paused) this.frame(dt);
     else if (this.host.online) this.pausedOnline(dt);
-    this.renderer.render(this.scene, this.camera);
+    if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera);
+    this.perf.tick(raw * 1000);
+    this.updatePerfOverlay();
+  }
+
+  // FPS, frame time, ping and draw calls; toggled with F3 or the settings checkbox.
+  updatePerfOverlay() {
+    const el = this.perfEl || (this.perfEl = document.getElementById('perf'));
+    if (!el) return;
+    const show = !!settings.showPerf || this.input.perfShown;
+    el.classList.toggle('hidden', !show);
+    if (!show) return;
+    const now = performance.now();
+    if (now - (this.perfAt || 0) < 400) return;
+    this.perfAt = now;
+    const info = this.renderer.info.render;
+    const ping = this.host.online && this.host.rtt ? ` | ping ${Math.round(this.host.rtt)} ms` : '';
+    el.textContent = `${this.perf.fps} fps | worst ${this.perf.worst.toFixed(0)} ms | ${this.quality.label} x${this.perf.scale.toFixed(2)} | ${info.calls} calls | ${(info.triangles / 1000).toFixed(0)}k tris${ping}`;
   }
 
   // The server keeps simulating while the pause menu is open, so keep sending
@@ -213,7 +261,7 @@ export class Game {
     const p = this.player;
     const m = this.match;
     this.time += dt;
-    this.input.updateLook(p);
+    this.input.updateLook(p, dt);
     document.getElementById('bigmap').classList.toggle('hidden', !this.input.mapOpen);
     const { events, alpha } = this.host.step(dt, () => this.input.sample());
     this.dispatch(events);
@@ -239,7 +287,9 @@ export class Game {
       }
     }
     this.contrails.update(dt);
-    this.stormView.sync(m.storm);
+    setListener(this.camera.position.x, this.camera.position.z, this.input.yaw);
+    this.footsteps(dt);
+    this.stormView.sync(m.storm, this.time);
     this.buildView.update(dt);
     this.lootView.update(dt, this.time, p.alive ? p.pos : this.camera.position);
     this.worldView.update(dt, this.time, this.focusHarvest);
@@ -251,6 +301,27 @@ export class Game {
     this.sun.position.set(focus.x + 80, focus.y + 140, focus.z + 50);
     this.sun.target.position.set(focus.x, focus.y, focus.z);
     this.worldView.sunSprite.position.copy(this.camera.position).add(new THREE.Vector3(80, 140, 50).normalize().multiplyScalar(1100));
+  }
+
+  // Footsteps for everyone close enough to hear: one step per stride walked,
+  // pitched by what is underfoot (sand, hard ground, grass).
+  footsteps(dt) {
+    const me = this.player;
+    for (const f of this.match.fighters) {
+      if (!f.alive || f.state !== 'ground' || !f.onGround) { f.stride = 0; continue; }
+      if (f === me ? false : Math.hypot(f.pos.x - me.pos.x, f.pos.z - me.pos.z) > 45) continue;
+      const speed = Math.hypot(f.vel.x, f.vel.z);
+      if (speed < 1.5) { f.stride = 0; continue; }
+      f.stride = (f.stride || 0) + speed * dt;
+      const len = f.crouch ? 1.8 : speed > 6.5 ? 2.6 : 2.1;
+      if (f.stride < len) continue;
+      f.stride = 0;
+      const h = f.pos.y;
+      const poi = poiAt(f.pos.x, f.pos.z);
+      const kind = h < 2.4 ? 'stepSand' : poi && poi.ground !== 'grass' && Math.hypot(f.pos.x - poi.x, f.pos.z - poi.z) < poi.pad ? 'stepHard' : 'step';
+      const own = f === me;
+      sfx(kind, own ? 0.5 : this.distanceVolume(f.pos, 45, 0) * 0.7 * (f.crouch ? 0.4 : 1), own ? null : f.pos);
+    }
   }
 
   updateBusMesh() {
@@ -400,14 +471,14 @@ export class Game {
           this.lootView.handle(ev); break;
         case 'sfx':
           if (ev.own && ev.by !== me) break;
-          sfx(ev.name, this.volumeFor(ev));
+          sfx(ev.name, this.volumeFor(ev), ev.pos && ev.by !== me ? ev.pos : null);
           break;
         case 'muzzle': this.fx.muzzle(ev.pos); break;
         case 'tracer': this.fx.tracer(ev.from, ev.to); break;
         case 'burst': this.fx.burst(ev.pos, ev.color, ev.n, ev.speed, ev.size ?? 1); break;
         case 'explosion':
           this.fx.explosion(ev.pos, ev.radius);
-          sfx('explosion', this.distanceVolume(ev.pos, 200, 0.1));
+          sfx('explosion', this.distanceVolume(ev.pos, 200, 0.1), ev.pos);
           this.cameraRig.shake(this.distanceVolume(ev.pos, 60, 0) * 1.2);
           break;
         case 'kick': if (ev.by === me) { hud.kick(ev.k); this.cameraRig.recoil(ev.pitch || 0, ev.yaw || 0); } break;

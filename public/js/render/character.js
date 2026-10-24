@@ -46,8 +46,9 @@ export function gunMesh(type, rarity, wrapId = null) {
 }
 
 // Distance bands: full detail and foot IK, reduced animation rate, then a stand-in.
-const LOD_NEAR = 40;
-const LOD_FAR = 150;
+let LOD_NEAR = 40;
+let LOD_FAR = 150;
+export function setLodDistances(near, far) { LOD_NEAR = near; LOD_FAR = far; }
 
 export class FighterView {
   constructor(scene, fighter, { groundAt = null } = {}) {

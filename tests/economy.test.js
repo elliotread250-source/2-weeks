@@ -165,3 +165,17 @@ needDb('rerolling: one per day, not on a finished challenge, changes the slot', 
   assert.equal((await economy.challenges(u, NOW + 86400e3)).rerollsLeft, 1);
   void WEEKLY;
 });
+
+needDb('career: stats and recent matches come back newest first', async () => {
+  const u = await user('Iris');
+  for (const [i, place] of [[1, 5], [2, 1]]) {
+    const { rows } = await db.query("INSERT INTO matches (mode, humans, bots, ended_at) VALUES ('solo', 2, 28, now()) RETURNING id");
+    await db.query('INSERT INTO match_players (match_id, user_id, placement, kills, damage, survival_s, coins_earned) VALUES ($1, $2, $3, $4, 100, 300, 50)', [rows[0].id, u, place, i]);
+  }
+  await db.query('UPDATE stats SET matches = 2, wins = 1, kills = 3 WHERE user_id = $1', [u]);
+  const c = await economy.career(u);
+  assert.equal(c.stats.matches, 2);
+  assert.equal(c.stats.wins, 1);
+  assert.deepEqual(c.recent.map((r) => r.placement), [1, 5]);
+  assert.equal(c.recent[0].players, 30);
+});

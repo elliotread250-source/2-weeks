@@ -191,6 +191,15 @@ export class HUD {
     this.hitT -= dt;
     this.hitmarkerEl.style.opacity = this.hitT > 0 ? 1 : 0;
     if (this.vigT > 0) { this.vigT -= dt; if (this.vigT <= 0) this.vignette.style.opacity = 0; }
+    // Low health: a slow red heartbeat at the screen edge (below 30 HP, faster below 15).
+    if (this.vigT <= 0 && p.alive && p.hp < 30) {
+      const rate = p.hp < 15 ? 2.6 : 1.5;
+      this.vignette.style.opacity = (0.25 + 0.3 * Math.max(0, Math.sin(game.time * rate * Math.PI * 2))).toFixed(2);
+      this.heartbeat = true;
+    } else if (this.heartbeat && this.vigT <= 0) {
+      this.vignette.style.opacity = 0;
+      this.heartbeat = false;
+    }
     if (this.gain.t > 0) { this.gain.t -= dt; if (this.gain.t <= 0) this.matGainEl.classList.remove('show'); }
 
     // Bars.

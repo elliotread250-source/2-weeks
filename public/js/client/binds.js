@@ -35,10 +35,11 @@ export const ACTIONS = [
   { id: 'emote', label: 'Emote wheel (hold, move mouse, release)', group: 'Other', def: 'KeyB' },
   { id: 'swapShoulder', label: 'Swap camera shoulder', group: 'Other', def: 'KeyG' },
   { id: 'map', label: 'Map', group: 'Other', def: 'KeyM' },
+  { id: 'perf', label: 'Show FPS and ping', group: 'Other', def: 'F3' },
 ];
 
 export const DEFAULT_BINDS = Object.fromEntries(ACTIONS.map((a) => [a.id, a.def]));
-export const DEFAULT_SETTINGS = { confirmEditOnRelease: true, sensitivity: 1, shadows: true, detail: 'high', shake: 1 };
+export const DEFAULT_SETTINGS = { confirmEditOnRelease: true, sensitivity: 1, shadows: true, detail: 'high', shake: 1, quality: 'auto', dynamicRes: true, showPerf: false, volMaster: 0.8, volSfx: 1, volMusic: 0.5 };
 
 function load(key, defaults) {
   try {

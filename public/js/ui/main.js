@@ -7,9 +7,10 @@ import { currentLoadout, refreshLoadout } from '../client/loadout.js';
 import { initLocker } from './locker.js';
 import { initShop } from './shop.js';
 import { initChallenges } from './challenges.js';
+import { initCareer } from './career.js';
 import { toast } from './toast.js';
 import { renderRewards } from './rewards.js';
-import { initAudio } from '../audio/audio.js';
+import { initAudio, startMusic, setVolumes } from '../audio/audio.js';
 import { ACTIONS, binds, settings, setBind, resetBinds, setSetting, keyLabel, label } from '../client/binds.js';
 
 const $ = (s) => document.querySelector(s);
@@ -36,6 +37,9 @@ function renderControls() {
     [label('interact'), 'Pick up / hold to open chests'],
     [label('reload'), 'Reload'],
     [label('map'), 'Map'],
+    [`${label('drop')} / ${label('inventory')}`, 'Drop selected item / hold for inventory'],
+    [`${label('emote')} / ${label('crouch')}`, 'Emote wheel (hold) / crouch'],
+    [label('perf'), 'Show FPS and ping'],
   ];
   $('#controls-table').innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 }
@@ -63,9 +67,13 @@ function openSettings() {
   $('#sens').value = settings.sensitivity;
   $('#sens-out').textContent = Number(settings.sensitivity).toFixed(2);
   $('#shake').value = settings.shake ?? 1;
+  $('#vol-master').value = settings.volMaster ?? 0.8;
+  $('#vol-sfx').value = settings.volSfx ?? 1;
+  $('#vol-music').value = settings.volMusic ?? 0.5;
   $('#confirm-release').checked = !!settings.confirmEditOnRelease;
-  $('#graphics').checked = settings.shadows !== false;
-  $('#detail').value = settings.detail || 'high';
+  $('#quality').value = settings.quality || 'auto';
+  $('#dynres').checked = settings.dynamicRes !== false;
+  $('#showperf').checked = !!settings.showPerf;
   listening = null;
   renderBinds();
   $('#settings').classList.remove('hidden');
@@ -119,9 +127,18 @@ $('#sens').addEventListener('input', (e) => {
   $('#sens-out').textContent = Number(settings.sensitivity).toFixed(2);
 });
 $('#shake').addEventListener('input', (e) => setSetting('shake', parseFloat(e.target.value)));
+for (const [id, key] of [['vol-master', 'volMaster'], ['vol-sfx', 'volSfx'], ['vol-music', 'volMusic']]) {
+  $(`#${id}`).addEventListener('input', (e) => {
+    setSetting(key, parseFloat(e.target.value));
+    setVolumes({ master: settings.volMaster, sfx: settings.volSfx, music: settings.volMusic });
+  });
+}
+// Browsers only allow audio after a click, so the lobby music starts on the first one.
+window.addEventListener('pointerdown', () => { initAudio(); if (!game) startMusic('lobby'); }, { once: true });
 $('#confirm-release').addEventListener('change', (e) => setSetting('confirmEditOnRelease', e.target.checked));
-$('#graphics').addEventListener('change', (e) => setSetting('shadows', e.target.checked));
-$('#detail').addEventListener('change', (e) => setSetting('detail', e.target.value));
+$('#quality').addEventListener('change', (e) => setSetting('quality', e.target.value));
+$('#dynres').addEventListener('change', (e) => setSetting('dynamicRes', e.target.checked));
+$('#showperf').addEventListener('change', (e) => setSetting('showPerf', e.target.checked));
 $('#binds-reset').addEventListener('click', () => { resetBinds(); renderBinds(); });
 $('#settings-btn').addEventListener('click', openSettings);
 $('#pause-settings-btn').addEventListener('click', openSettings);
@@ -148,7 +165,7 @@ async function onMatchEnd(summary, online) {
 
 function launch(opts) {
   try {
-    game = new Game($('#app'), { shadows: settings.shadows !== false, detail: settings.detail || 'high', loadout: currentLoadout(), onEnd: onMatchEnd, name: $('#player-name').value.trim() || undefined, ...opts });
+    game = new Game($('#app'), { loadout: currentLoadout(), onEnd: onMatchEnd, name: $('#player-name').value.trim() || undefined, ...opts });
     window.__game = game;
     $('#lobby').classList.add('hidden');
     $('#loading').classList.remove('show');
@@ -224,3 +241,4 @@ refreshLoadout();
 initLocker();
 initShop();
 initChallenges();
+initCareer();
