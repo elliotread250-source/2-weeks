@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 1 to 6 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
+Status: Phases 1 to 7 done (sim split from renderer; online netcode; accounts; skinned characters; cosmetics and locker). Later phases below are still plans. Update this file at the end of every phase.
 
 ## Current state (end of Phase 1)
 
@@ -61,6 +61,10 @@ Client: `client/loadout.js` holds the store (owned set + loadout) and persists i
 ## Economy (Phase 6)
 
 All rules are pure data in `shared/economy/` (coin table, shop rotation, challenge defs) and all money movement is in `server/economy.js`. Rule: every coin change is `accounts.applyLedger` inside a transaction, keyed by (user, reason, ref), so a retry is a no-op. Online: `recordMatch` pays the match and advances challenges in the same transaction, then the room sends a `reward` frame to each signed-in client. Offline: the client posts its result to `/api/offline-result`; the server checks plausibility, enforces a 60 s gap and 500 coins/day, and pays half rate. The shop is a pure function of the UTC date, so `buy` simply checks the item is on today's shelf. Known limit: an offline cheater can fake results up to the daily cap.
+
+## Weapons, projectiles and drops (Phase 7)
+
+Weapons are rows in `config.WEAPONS`; behaviour flags are `burst` (queue of follow-up rounds ticked in `Combat.updateBurst`), `pellets`, `projectile` (rocket) and `scope`. Adding a gun is: a config row, a name, a loot weight, `gunMesh` case, icon, `classOfWeapon` entry (a test enforces the last two). Rockets and grenades live in `combat.rockets` / `combat.grenades` on the server and are drawn on every client from `projSpawn` (position, velocity, life) and `projEnd` events, so the replica never has to tick combat. Supply drops are chests with `falling: true` that the loot system lowers each tick, broadcasting `chestMoved` every 6th tick; a `supplyDrop` event (and the welcome message for late joiners) creates the chest on replicas.
 
 ## Module map: where everything moves
 

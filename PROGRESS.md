@@ -100,7 +100,22 @@ Not done / to check:
 - Offline matches pay coins but do not advance challenges (a client report cannot be trusted for that). Party codes are not built; they depend on a private-room flow in the matchmaker and land with the lobby rework in Phase 11.
 - Challenge text/rewards are first-pass numbers; tune after real play.
 
-## Next: Phase 7 (weapons and combat)
+## Phase 7: weapons and combat (done 2026-10-24)
+
+Done:
+- Four new guns, all data in `shared/config.js`: Tactical Shotgun (semi-auto), Burst Rifle (3-round bursts, gap 85 ms, cancelled by switching or reloading), Marksman Rifle, Revolver. Each has per-rarity damage/reload, falloff where it matters, recoil values, a code-built model, an icon, a reticle, an animation class and sounds (aliased onto the existing synth guns until Phase 11).
+- Frag Grenade: a throwable consumable (arcs, bounces off the map, 2.2 s fuse, 5.5 m splash that also hurts builds and props). Projectiles (rockets and grenades) now reach clients as `projSpawn`/`projEnd` events, which also fixes rockets being invisible to online players.
+- Camera recoil: weapon-specific view kick that decays; it is visual only and never changes where bullets go.
+- Supply drops: at each storm phase from the second on, a balloon crate falls into the next circle (beam visible from afar), cannot be opened until it lands, then holds an Epic+ gun, ammo, shield potions, grenades and metal/brick. Synced to online clients (including late joiners).
+- Drop item (H) and a hold-Tab inventory overlay (slots, ammo reserves, materials).
+- Tests: 8 new (data completeness, loot rolls, burst timing and cancel, grenade lifecycle, supply drop rules, drop command).
+
+Not done / to check:
+- Bots do not throw grenades or use the new weapons smartly (they pick them up and shoot like any gun). Grenade bounces are simulated on the server only; clients draw a simple arc and snap to the blast point.
+- Weapon feel (spread, damage, fire rates) is set from memory of similar games and unplaytested on real hardware. Expect a tuning pass.
+- No weapon-specific hit sounds or shell ejection yet (Phase 11 audio).
+
+## Next: Phase 8 (building, editing, destruction)
 
 Not started.
 

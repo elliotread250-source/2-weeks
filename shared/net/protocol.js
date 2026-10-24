@@ -121,7 +121,7 @@ export function sanitizeCommand(c) {
     yaw: fin(c.yaw) % (Math.PI * 200),
     pitch: clamp(fin(c.pitch), -1.5, 1.5),
     held: c.held & 0xff,
-    act: c.act & 0x7ff,
+    act: c.act & 0xfff,
     slot: clamp(c.slot | 0, -1, 5),
     slotStep: clamp(c.slotStep | 0, -1, 1),
     piece: clamp(c.piece | 0, -1, 3),

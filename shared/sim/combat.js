@@ -1,7 +1,7 @@
 // Shooting, pickaxe swings, rockets, healing, reloading and damage. Shared by
 // humans and bots so everyone plays by the same rules. Sound, particles and HUD
 // feedback leave as events (see Match.emit); nothing here touches the renderer.
-import { WEAPONS, PICKAXE, CONSUMABLES, PLAYER, FALLOFF, MAX_MATS } from '../config.js';
+import { WEAPONS, PICKAXE, CONSUMABLES, PLAYER, FALLOFF, MAX_MATS, GRENADE } from '../config.js';
 import { rayBox } from './collision.js';
 import { Vec3 } from '../math/vec3.js';
 import { GAME } from '../names.js';
@@ -13,6 +13,7 @@ export class Combat {
   constructor(match) {
     this.m = match;
     this.rockets = [];
+    this.grenades = [];
     this.nextRocketId = 1;
   }
 
@@ -79,6 +80,7 @@ export class Combat {
       f.hitFx = Math.max(0, f.hitFx - dt);
       f.placeFx = Math.max(0, f.placeFx - dt);
       f.swingT = Math.max(0, f.swingT - dt);
+      if (f.burst) this.updateBurst(f, dt);
       if (f.pendingSwing) {
         f.pendingSwing.t -= dt;
         if (f.pendingSwing.t <= 0) this.resolveSwing(f);
@@ -103,15 +105,29 @@ export class Combat {
       }
     }
     this.updateRockets(dt);
+    this.updateGrenades(dt);
+  }
+
+  // Remaining rounds of a burst fire a fixed gap apart, aimed where the player looks now.
+  updateBurst(f, dt) {
+    const b = f.burst;
+    if (!f.weapon || f.weapon.type !== b.type || f.reloadT > 0) { f.burst = null; return; }
+    b.t -= dt;
+    if (b.t > 0) return;
+    const { origin, dir } = f.aimRay();
+    this.fire(f, origin, dir, { ads: f.ads, burstShot: true });
+    if (!f.burst) return;
+    if (--b.left <= 0) f.burst = null; else b.t += WEAPONS[b.type].burst.gap;
   }
 
   // ---------------------------------------------------------------- guns
 
   fire(f, origin, dir, opts = {}) {
     const w = f.weapon;
-    if (!w || f.fireCd > 0 || f.reloadT > 0) return false;
+    if (!w || (f.fireCd > 0 && !opts.burstShot) || f.reloadT > 0) return false;
     const spec = WEAPONS[w.type];
     if (w.mag <= 0) {
+      f.burst = null;
       if (!this.tryReload(f)) { this.sfx('empty', f.pos, f.id); f.fireCd = 0.3; }
       return false;
     }
@@ -119,7 +135,10 @@ export class Combat {
     f.emote = 0;
     f.fireFx = 0.18;
     w.mag -= 1;
-    f.fireCd = 1 / spec.fireRate;
+    if (!opts.burstShot) {
+      f.fireCd = 1 / spec.fireRate;
+      if (spec.burst) f.burst = { left: spec.burst.shots - 1, t: spec.burst.gap, type: w.type };
+    }
     const moving = Math.hypot(f.vel.x, f.vel.z) > 1;
     let spread = opts.ads ? spec.adsSpread : spec.spread;
     if (spec.pellets === 1) {
@@ -133,7 +152,7 @@ export class Combat {
     const muzzle = this.muzzlePos(f);
     this.m.emit('muzzle', { pos: muzzle });
     this.sfx(w.type, f.pos, f.id);
-    this.m.emit('kick', { by: f.id, k: w.type === 'sniper' || w.type === 'pump' ? 1 : 0.4 });
+    this.m.emit('kick', { by: f.id, k: w.type === 'sniper' || w.type === 'pump' || w.type === 'tac' ? 1 : 0.4, pitch: spec.recoil ? spec.recoil.pitch : 0, yaw: spec.recoil ? (this.rng.random() * 2 - 1) * spec.recoil.yaw : 0 });
 
     if (spec.projectile) {
       this.spawnRocket(f, muzzle, this.spreadDir(dir, spread), spec, w);
@@ -182,10 +201,13 @@ export class Combat {
   // ---------------------------------------------------------------- rockets
 
   spawnRocket(f, pos, dir, spec, w) {
-    this.rockets.push({
+    const r = {
       id: this.nextRocketId++, owner: f, pos: pos.clone(), dir: dir.clone(), speed: spec.projectile.speed, life: 6,
       damage: spec.damage[w.rarity], splash: spec.projectile.splash, structure: spec.projectile.structureDamage, name: spec.name,
-    });
+    };
+    this.rockets.push(r);
+    // Clients draw projectiles from these events (the replica never ticks combat).
+    this.m.emit('projSpawn', { id: r.id, kind: 'rocket', pos: { x: pos.x, y: pos.y, z: pos.z }, vel: { x: dir.x * r.speed, y: dir.y * r.speed, z: dir.z * r.speed }, life: r.life });
   }
 
   updateRockets(dt) {
@@ -195,12 +217,65 @@ export class Combat {
       const step = r.speed * dt;
       const hit = this.trace(r.pos, r.dir, step, r.owner);
       if (hit.fighter || hit.world || r.life <= 0) {
+        this.m.emit('projEnd', { id: r.id, kind: 'rocket', pos: { x: hit.point.x, y: hit.point.y, z: hit.point.z } });
         this.explode(hit.point, r);
         this.rockets.splice(i, 1);
         continue;
       }
       r.pos.addScaledVector(r.dir, step);
       if (this.rng.random() < 0.6) this.m.emit('burst', { pos: r.pos, color: '#cccccc', n: 1, speed: 0.6, size: 0.8 });
+    }
+  }
+
+  // ---------------------------------------------------------------- grenades
+
+  // Throw the selected Frag Grenade: one is used up, it arcs, bounces and blows after the fuse.
+  throwGrenade(f, origin, dir) {
+    const it = f.item;
+    if (!it || it.kind !== 'consumable' || !CONSUMABLES[it.type].throw || f.fireCd > 0) return false;
+    f.heal = null;
+    f.emote = 0;
+    f.fireFx = 0.3;
+    f.fireCd = 0.7;
+    it.count -= 1;
+    if (it.count <= 0) f.slots[f.selected - 1] = null;
+    const vel = dir.clone().multiplyScalar(GRENADE.speed);
+    vel.y += GRENADE.speed * GRENADE.up;
+    vel.x += f.vel.x * 0.5; vel.z += f.vel.z * 0.5;
+    const pos = origin.clone().addScaledVector(dir, 0.8);
+    const g = { id: this.nextRocketId++, owner: f, pos, vel, life: GRENADE.fuse, settled: false };
+    this.grenades.push(g);
+    this.m.emit('projSpawn', { id: g.id, kind: 'grenade', pos: { x: pos.x, y: pos.y, z: pos.z }, vel: { x: vel.x, y: vel.y, z: vel.z }, life: g.life });
+    this.sfx('swing', f.pos, f.id);
+    return true;
+  }
+
+  updateGrenades(dt) {
+    for (let i = this.grenades.length - 1; i >= 0; i--) {
+      const g = this.grenades[i];
+      g.life -= dt;
+      if (!g.settled) {
+        g.vel.y -= GRENADE.gravity * dt;
+        const len = g.vel.length() * dt;
+        if (len > 1e-4) {
+          const d = g.vel.clone().normalize();
+          const hit = this.col.raycast(g.pos, d, len + 0.15);
+          if (hit && hit.normal) {
+            const n = hit.normal;
+            const dot = g.vel.dot(n);
+            g.vel.addScaledVector(n, -2 * dot).multiplyScalar(GRENADE.bounce);
+            g.pos.addScaledVector(d, Math.max(0, hit.t - 0.05)).addScaledVector(n, 0.12);
+            if (g.vel.length() < 2.5) { g.settled = true; g.vel.set(0, 0, 0); }
+          } else {
+            g.pos.addScaledVector(g.vel, dt);
+          }
+        }
+      }
+      if (g.life <= 0) {
+        this.grenades.splice(i, 1);
+        this.m.emit('projEnd', { id: g.id, kind: 'grenade', pos: { x: g.pos.x, y: g.pos.y, z: g.pos.z } });
+        this.explode(g.pos, { damage: GRENADE.damage, splash: GRENADE.splash, structure: GRENADE.structureDamage, owner: g.owner, name: CONSUMABLES.grenade.name });
+      }
     }
   }
 

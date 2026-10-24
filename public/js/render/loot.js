@@ -8,7 +8,7 @@ import { gunMesh } from './character.js';
 import { itemCardCanvas } from '../ui/icons.js';
 
 const MAT_COLORS = { wood: '#b5763d', brick: '#c0563b', metal: '#9aa5b1' };
-const CONS_COLORS = { bandage: '#f5f5f5', medkit: '#e74c3c', minis: '#5dade2', bigpot: '#2e86de', chug: '#48c9b0' };
+const CONS_COLORS = { bandage: '#f5f5f5', medkit: '#e74c3c', minis: '#5dade2', bigpot: '#2e86de', chug: '#48c9b0', grenade: '#6b8f3a' };
 
 export class LootView {
   constructor(scene) {
@@ -74,6 +74,8 @@ export class LootView {
         ? new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3, 12), this.lam(c))
         : item.type === 'medkit'
           ? new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.42, 0.24), this.lam(c))
+          : item.type === 'grenade'
+            ? new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), this.lam(c))
           : new THREE.Mesh(new THREE.SphereGeometry(item.type === 'minis' ? 0.2 : 0.3, 12, 10), this.lam(c));
       g.add(m);
     } else if (item.kind === 'ammo') {
@@ -109,7 +111,40 @@ export class LootView {
     const { type } = c;
     const g = new THREE.Group();
     let lid;
-    if (type === 'chest') {
+    if (type === 'supply') {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 1.2), this.lam('#c0392b'));
+      base.position.y = 0.5;
+      const band = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.2, 1.24), this.lam('#f5f5f5'));
+      band.position.y = 0.5;
+      lid = new THREE.Group();
+      lid.position.set(0, 1.0, 0.6);
+      const lm = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.2, 1.22), this.lam('#e74c3c'));
+      lm.position.set(0, 0.1, -0.6);
+      lid.add(lm);
+      g.add(base, band, lid);
+      // Balloon canopy while it falls, and a tall beam so it can be found from across the island.
+      const canopy = new THREE.Group();
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(2.6, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#f5f5f5', side: THREE.DoubleSide }));
+      dome.position.y = 6;
+      canopy.add(dome);
+      for (const [x, z] of [[-0.8, -0.5], [0.8, -0.5], [-0.8, 0.5], [0.8, 0.5]]) {
+        const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 6, 4), this.lam('#333'));
+        rope.position.set(x * 1.6, 3.4, z * 1.6);
+        rope.rotation.set(z * 0.3, 0, -x * 0.3);
+        canopy.add(rope);
+      }
+      g.add(canopy);
+      g.userData.canopy = canopy;
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 120, 8, 1, true), new THREE.MeshBasicMaterial({ color: '#ff5a3c', transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
+      beam.position.y = 60;
+      g.add(beam);
+      g.userData.beam = beam;
+      const sp = new THREE.Sprite(this.sparkle);
+      sp.scale.set(2.2, 2.2, 1);
+      sp.position.y = 1.4;
+      g.add(sp);
+      g.userData.sparkle = sp;
+    } else if (type === 'chest') {
       const base = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.55, 0.7), this.lam('#c8901e'));
       base.position.y = 0.28;
       lid = new THREE.Group();
@@ -158,7 +193,7 @@ export class LootView {
         if (v) { this.scene.remove(v.root); this.pickups.delete(ev.pk.id); }
         break;
       }
-      case 'chestPlaced': this.makeChest(ev.c); break;
+      case 'chestPlaced': case 'supplyDrop': this.makeChest(ev.c); break;
       case 'chestOpened': {
         const v = this.chests.get(ev.c.id);
         if (v && v.mesh.userData.sparkle) v.mesh.userData.sparkle.visible = false;
@@ -197,6 +232,13 @@ export class LootView {
       }
     }
     for (const v of this.chests.values()) {
+      if (v.mesh.userData.canopy) {
+        v.mesh.userData.canopy.visible = !!v.c.falling;
+        v.mesh.userData.beam.visible = !v.c.opened;
+        // Smooth between the 5 Hz position updates a replica gets while the crate falls.
+        v.mesh.position.y += (v.c.pos.y - v.mesh.position.y) * Math.min(1, dt * 8);
+        v.mesh.rotation.z = v.c.falling ? Math.sin(time * 1.6) * 0.06 : 0;
+      }
       if (v.c.opened && v.openT < 1) {
         v.openT = Math.min(1, v.openT + dt * 3);
         v.lid.rotation.x = -v.openT * 1.6;

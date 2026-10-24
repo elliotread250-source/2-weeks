@@ -57,6 +57,7 @@ export class Fighter {
     this.pendingSwing = null;
     this.flash = 0;
     this.lastHitBy = null;
+    this.burst = null; // pending rounds of a burst-fire weapon
     this.contrib = new Map(); // attacker id -> damage dealt to me, for assists
     this.resetControl();
   }
@@ -190,6 +191,7 @@ export class Fighter {
   select(i) {
     if (i === this.selected) return;
     this.selected = i;
+    this.burst = null;
     this.reloadT = 0;
     this.heal = null;
     this.fireCd = Math.max(this.fireCd, 0.25); // equip time

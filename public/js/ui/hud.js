@@ -10,7 +10,10 @@ const $ = (s) => document.querySelector(s);
 
 // Reticles drawn twice: dark outline under a white line so they read on any
 // background. Coordinates are in a 200x200 box centred on the screen centre.
+const RETICLE_OF = { tac: 'pump', burst: 'ar', dmr: 'pistol', revolver: 'pistol' };
+
 function reticleSVG(kind, gap) {
+  kind = RETICLE_OF[kind] || kind;
   const C = 100;
   const g = Math.min(80, gap);
   let d = '', circles = '', dots = '';

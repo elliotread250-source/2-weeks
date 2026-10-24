@@ -1,11 +1,11 @@
 // Floor loot, chests and ammo boxes, plus the pickups that drop from them and
 // from eliminated players. Pure simulation: the renderer draws pickups and
 // chests from `pickups` / `chests` and listens for loot events.
-import { WEAPONS, CONSUMABLES, RARITIES, AMMO, LOOT_WEIGHTS } from '../config.js';
+import { WEAPONS, CONSUMABLES, RARITIES, AMMO, LOOT_WEIGHTS, SUPPLY } from '../config.js';
 import { Vec3 } from '../math/vec3.js';
 
-const WEAPON_WEIGHTS = { ar: 30, smg: 20, pump: 22, pistol: 16, sniper: 8, rocket: 4 };
-const CONSUMABLE_WEIGHTS = { bandage: 30, minis: 30, medkit: 14, bigpot: 18, chug: 4 };
+const WEAPON_WEIGHTS = { ar: 24, smg: 16, pump: 16, pistol: 12, sniper: 6, rocket: 3, tac: 10, burst: 12, dmr: 7, revolver: 8 };
+const CONSUMABLE_WEIGHTS = { bandage: 30, minis: 30, medkit: 14, bigpot: 18, chug: 4, grenade: 16 };
 
 export function rollWeapon(rng, table = 'floor') {
   const types = Object.keys(WEAPON_WEIGHTS);
@@ -76,13 +76,33 @@ export class LootSystem {
     return c;
   }
 
+  // A crate that falls from the sky into the next safe circle. It cannot be
+  // opened until it lands, and everything in it is top shelf.
+  addSupplyDrop(x, z) {
+    const gy = this.col.groundHeight(x, z, 400, 0.2);
+    const c = { id: this.nextId++, type: 'supply', pos: new Vec3(x, gy + SUPPLY.height, z), rot: this.rng.range(0, Math.PI * 2), opened: false, falling: true, landY: gy, sync: 0 };
+    this.chests.push(c);
+    this.emit('supplyDrop', { c });
+    return c;
+  }
+
   openChest(c, by = null) {
-    if (c.opened) return;
+    if (c.opened || c.falling) return;
     c.opened = true;
     if (by && by.stats && c.type === 'chest') by.stats.chests++;
     const r = this.rng;
     const p = c.pos.clone().add(new Vec3(0, 0.6, 0));
-    if (c.type === 'chest') {
+    if (c.type === 'supply') {
+      const w = rollWeapon(r, 'chest');
+      w.rarity = Math.max(w.rarity, 3);
+      while (WEAPONS[w.type].damage[w.rarity] == null && w.rarity < 4) w.rarity++;
+      this.drop(w, p, true);
+      this.drop(ammoFor(w.type, 3), p, true);
+      this.drop({ kind: 'consumable', type: 'bigpot', count: 2 }, p, true);
+      this.drop({ kind: 'consumable', type: 'grenade', count: 3 }, p, true);
+      this.drop({ kind: 'mat', type: 'metal', count: 150 }, p, true);
+      this.drop({ kind: 'mat', type: 'brick', count: 100 }, p, true);
+    } else if (c.type === 'chest') {
       const w = rollWeapon(r, 'chest');
       this.drop(w, p, true);
       this.drop(ammoFor(w.type, 2), p, true);
@@ -115,6 +135,15 @@ export class LootSystem {
   }
 
   update(dt) {
+    for (const c of this.chests) {
+      if (!c.falling) continue;
+      c.pos.y = Math.max(c.landY, c.pos.y - SUPPLY.fallSpeed * dt);
+      if (c.pos.y <= c.landY) {
+        c.falling = false;
+        this.emit('chestMoved', { c });
+        this.emit('supplyLanded', { id: c.id, pos: { x: c.pos.x, y: c.pos.y, z: c.pos.z } });
+      } else if (++c.sync % 6 === 0) this.emit('chestMoved', { c });
+    }
     for (const p of this.pickups) {
       p.age += dt;
       if (p.settled) continue;
@@ -143,7 +172,7 @@ export class LootSystem {
   nearestChest(pos, maxDist) {
     let best = null, bd = maxDist;
     for (const c of this.chests) {
-      if (c.opened) continue;
+      if (c.opened || c.falling) continue;
       const d = Math.hypot(c.pos.x - pos.x, (c.pos.y - pos.y) * 1.5, c.pos.z - pos.z);
       if (d < bd) { bd = d; best = c; }
     }

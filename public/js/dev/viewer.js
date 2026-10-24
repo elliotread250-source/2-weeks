@@ -41,7 +41,7 @@ for (const n of names) sel.add(new Option(n, n));
 const outfit = document.createElement('select');
 OUTFITS.forEach((_, i) => outfit.add(new Option(`outfit ${i}`, i)));
 const gun = document.createElement('select');
-for (const g of ['none', 'ar', 'pump', 'smg', 'pistol', 'sniper', 'rocket']) gun.add(new Option(g, g));
+for (const g of ['none', 'ar', 'pump', 'smg', 'pistol', 'sniper', 'rocket', 'tac', 'burst', 'dmr', 'revolver']) gun.add(new Option(g, g));
 ui.append(sel, outfit, gun);
 
 function setClip(name, t = 0, speed = 1) {
